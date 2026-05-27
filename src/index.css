@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #0f0f13;
+  color: #f1f1f5;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  margin: 0;
+}
+
+#root {
+  width: 100%;
+  min-height: 100svh;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1a1a22;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a2a38;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #f97316;
+}
+
+/* Mobile: reserve space for fixed bottom nav */
+@media (max-width: 639px) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .has-bottom-nav {
+    padding-bottom: 66px !important;
+  }
+  /* Reduce outer padding on all public view containers */
+  .has-bottom-nav > div {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    padding-top: 20px !important;
+    padding-bottom: 20px !important;
+  }
+  /* Horizontal scroll for wide tables */
+  .scroll-x {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    min-width: min-content;
+  }
+}

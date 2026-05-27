@@ -1,0 +1,22 @@
+{
+  "jugadores": [
+    { "id": "0001", "nombre": "Carlos Mendoza", "sexo": "M", "cat": "7" },
+    { "id": "0002", "nombre": "Matías Romero", "sexo": "M", "cat": "7" },
+    { "id": "0003", "nombre": "Lucas Peralta", "sexo": "M", "cat": "7" },
+    { "id": "0004", "nombre": "Gonzalo Silva", "sexo": "M", "cat": "7" },
+    { "id": "0005", "nombre": "Diego Juárez", "sexo": "M", "cat": "7" },
+    { "id": "0006", "nombre": "Fernando Galarza", "sexo": "M", "cat": "7" },
+    { "id": "0007", "nombre": "Ariel Benítez", "sexo": "M", "cat": "7" },
+    { "id": "0008", "nombre": "Javier Ortega", "sexo": "M", "cat": "7" },
+    { "id": "0009", "nombre": "Tomás Acosta", "sexo": "M", "cat": "7" },
+    { "id": "0010", "nombre": "Nicolás Maidana", "sexo": "M", "cat": "7" },
+    { "id": "0011", "nombre": "Esteban Ríos", "sexo": "M", "cat": "7" },
+    { "id": "0012", "nombre": "Hugo Insaurralde", "sexo": "M", "cat": "7" },
+    { "id": "0013", "nombre": "Rodrigo Vallejos", "sexo": "M", "cat": "7" },
+    { "id": "0014", "nombre": "Cristian Galeano", "sexo": "M", "cat": "7" },
+    { "id": "0015", "nombre": "Mariano Gómez", "sexo": "M", "cat": "7" },
+    { "id": "0016", "nombre": "Valeria Espínola", "sexo": "F", "cat": "7" },
+    { "id": "0017", "nombre": "Santi Bareiro", "sexo": "M", "cat": "7" },
+    { "id": "0018", "nombre": "Héctor Cardozo", "sexo": "M", "cat": "5" }
+  ]
+}
