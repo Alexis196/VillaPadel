@@ -1,11 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import Navbar from './components/Navbar'
-import GroupsView from './components/Groups/GroupsView'
-import StandingsView from './components/Standings/StandingsView'
-import MatchesView from './components/Matches/MatchesView'
-import PlayersView from './components/Players/PlayersView'
-import BracketView from './components/Bracket/BracketView'
+import LandingView from './components/Landing/LandingView'
+import TorneosListView from './components/Torneos/TorneosListView'
+import TorneoDetailView from './components/Torneos/TorneoDetailView'
 import LoginView from './components/Auth/LoginView'
 import AdminLayout from './components/Admin/AdminLayout'
 import Spinner from './components/ui/Spinner'
@@ -33,15 +31,17 @@ export default function App() {
           <Route path="/*" element={
             <>
               <Navbar />
-              <main className="has-bottom-nav">
+              <main>
                 <Routes>
-                  <Route path="/" element={<Navigate to="/torneos" replace />} />
+                  <Route path="/" element={<LandingView />} />
+                  <Route path="/torneos" element={<TorneosListView />} />
+                  <Route path="/torneos/:id" element={<TorneoDetailView />} />
+                  {/* Legacy redirects */}
                   <Route path="/grupos" element={<Navigate to="/torneos" replace />} />
-                  <Route path="/torneos" element={<GroupsView />} />
-                  <Route path="/tabla" element={<StandingsView />} />
-                  <Route path="/partidos" element={<MatchesView />} />
-                  <Route path="/jugadores" element={<PlayersView />} />
-                  <Route path="/llave" element={<BracketView />} />
+                  <Route path="/tabla" element={<Navigate to="/torneos" replace />} />
+                  <Route path="/partidos" element={<Navigate to="/torneos" replace />} />
+                  <Route path="/jugadores" element={<Navigate to="/torneos" replace />} />
+                  <Route path="/llave" element={<Navigate to="/torneos" replace />} />
                 </Routes>
               </main>
             </>

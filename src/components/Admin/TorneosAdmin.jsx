@@ -3,6 +3,7 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore'
 import { db } from '../../firebase/config'
 import { createTorneo, updateTorneo, deleteTorneo, addDupla, generateFixture, generateBracket } from '../../firebase/torneoService'
 import Spinner from '../ui/Spinner'
+import { useIsMobile } from '../../hooks/useIsMobile'
 
 const CAT_OPTIONS = [
   { id: 'cat-8va', name: '8va Categoría', valor: 8, color: '#64748b' },
@@ -128,6 +129,7 @@ const defaultDupla = (costo = '') => ({
 })
 
 function AddDuplasModal({ torneoId, torneoNombre, torneoEstado, torneoTipoTorneo, torneoCategoriaValor, torneoSexo, torneoCosto, onClose, onFixtureGenerated }) {
+  const isMobile = useIsMobile()
   const isSuma = torneoTipoTorneo === 'suma'
   const sumaMinima = Number(torneoCategoriaValor || 0)
   const isEnCurso = torneoEstado !== 'Inscripción'
@@ -218,7 +220,6 @@ function AddDuplasModal({ torneoId, torneoNombre, torneoEstado, torneoTipoTorneo
     const bothSelected = !!(duplas[i].jugador1 && duplas[i].jugador2 && duplas[i].jugador1Valor !== null && duplas[i].jugador2Valor !== null)
     const sumaOk = duplaSum >= sumaMinima
 
-    // Exclude players already in this torneo's duplas + any slot in the current form
     const usedNames = new Set([
       ...existingPlayerNames,
       ...duplas.flatMap(d => [d.jugador1, d.jugador2]).filter(n => n.trim()),
@@ -226,38 +227,64 @@ function AddDuplasModal({ torneoId, torneoNombre, torneoEstado, torneoTipoTorneo
     if (currentName.trim()) usedNames.delete(currentName)
     const availablePlayers = eligibleJugadores.filter(j => !usedNames.has(j.name))
 
+    const playerSelect = (
+      <PlayerSearchSelect
+        value={currentName}
+        selectedId={currentJugadorId}
+        players={availablePlayers.map(j => ({
+          ...j,
+          displayCategory: (isSuma && torneoSexo === 'masculino' && j.sexo === 'F')
+            ? `${j.categoryName} +2`
+            : j.categoryName,
+        }))}
+        onSelect={j => isSuma
+          ? selectPlayer(i, num, j.id)
+          : updateDupla(i, num === 1 ? 'jugador1' : 'jugador2', j.name)
+        }
+        onChange={!isSuma ? (val => updateDupla(i, num === 1 ? 'jugador1' : 'jugador2', val)) : undefined}
+        placeholder={`Jugador ${num}`}
+        style={{ ...rowInput, width: '100%' }}
+        mode={isSuma ? 'select' : 'freeform'}
+      />
+    )
+    const sumaBadge = isSuma && num === 2 && bothSelected && (
+      <span style={{ fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, color: sumaOk ? '#22c55e' : '#ef4444', background: sumaOk ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)', padding: '2px 6px', borderRadius: 4 }}>
+        Σ{duplaSum}/{sumaMinima}
+      </span>
+    )
+
+    if (isMobile) {
+      return (
+        <div key={num} style={{ marginBottom: num === 1 ? 8 : 0 }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4 }}>
+            <span style={{ color: labelColor, fontSize: 11, fontWeight: 700, width: 22, flexShrink: 0 }}>J{num}</span>
+            <div style={{ flex: 1, display: 'flex', gap: 4, alignItems: 'center', minWidth: 0 }}>
+              {playerSelect}
+              {sumaBadge}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 4, paddingLeft: 28 }}>
+            <select value={pago.estado} onChange={e => updatePago(i, num, 'estado', e.target.value)} style={{ ...rowInput, flex: 1, cursor: 'pointer' }}>
+              <option value="pendiente">Pendiente</option>
+              <option value="pagado">Pagado</option>
+            </select>
+            <select value={pago.metodo} onChange={e => updatePago(i, num, 'metodo', e.target.value)} style={{ ...rowInput, flex: 1, cursor: 'pointer' }} disabled={pago.estado !== 'pagado'}>
+              <option value="">— Método</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+            </select>
+            <input type="number" placeholder="$0" value={pago.monto} onChange={e => updatePago(i, num, 'monto', e.target.value)} style={{ ...rowInput, width: 60 }} disabled={pago.estado !== 'pagado'} />
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div key={num} style={{ display: 'grid', gridTemplateColumns: '26px 1fr 96px 116px 76px', gap: 6, marginBottom: num === 1 ? 5 : 0, alignItems: 'center' }}>
         <span style={{ color: labelColor, fontSize: 11, fontWeight: 700, alignSelf: 'center' }}>J{num}</span>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          <PlayerSearchSelect
-            value={currentName}
-            selectedId={currentJugadorId}
-            players={availablePlayers.map(j => ({
-              ...j,
-              displayCategory: (isSuma && torneoSexo === 'masculino' && j.sexo === 'F')
-                ? `${j.categoryName} +2`
-                : j.categoryName,
-            }))}
-            onSelect={j => isSuma
-              ? selectPlayer(i, num, j.id)
-              : updateDupla(i, num === 1 ? 'jugador1' : 'jugador2', j.name)
-            }
-            onChange={!isSuma ? (val => updateDupla(i, num === 1 ? 'jugador1' : 'jugador2', val)) : undefined}
-            placeholder={`Jugador ${num}`}
-            style={{ ...rowInput, width: '100%' }}
-            mode={isSuma ? 'select' : 'freeform'}
-          />
-          {isSuma && num === 2 && bothSelected && (
-            <span style={{
-              fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0,
-              color: sumaOk ? '#22c55e' : '#ef4444',
-              background: sumaOk ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)',
-              padding: '2px 6px', borderRadius: 4,
-            }}>
-              Σ{duplaSum}/{sumaMinima}
-            </span>
-          )}
+          {playerSelect}
+          {sumaBadge}
         </div>
         <select value={pago.estado} onChange={e => updatePago(i, num, 'estado', e.target.value)} style={{ ...rowInput, cursor: 'pointer' }}>
           <option value="pendiente">Pendiente</option>
@@ -274,8 +301,8 @@ function AddDuplasModal({ torneoId, torneoNombre, torneoEstado, torneoTipoTorneo
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }}>
-      <div style={{ background: '#1a1a22', borderRadius: 14, border: '1px solid #2a2a38', width: '100%', maxWidth: 860, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', zIndex: 1100, padding: isMobile ? 0 : 20 }}>
+      <div style={{ background: '#1a1a22', borderRadius: isMobile ? '14px 14px 0 0' : 14, border: '1px solid #2a2a38', width: '100%', maxWidth: isMobile ? '100%' : 860, maxHeight: isMobile ? '95vh' : '90vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '20px 24px', borderBottom: '1px solid #2a2a38', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <h2 style={{ color: '#f1f1f5', fontSize: 18, fontWeight: 700, margin: 0 }}>
@@ -302,13 +329,15 @@ function AddDuplasModal({ torneoId, torneoNombre, torneoEstado, torneoTipoTorneo
           </div>
         ) : (
           <>
-            <div style={{ padding: '10px 24px 4px', background: '#13131a', borderBottom: '1px solid #2a2a38' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '26px 1fr 96px 116px 76px 32px', gap: 6 }}>
-                {['', 'Jugador', 'Estado', 'Método', 'Monto', ''].map((h, idx) => (
-                  <div key={idx} style={{ color: '#6666a0', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', paddingBottom: 6 }}>{h}</div>
-                ))}
+            {!isMobile && (
+              <div style={{ padding: '10px 24px 4px', background: '#13131a', borderBottom: '1px solid #2a2a38' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '26px 1fr 96px 116px 76px 32px', gap: 6 }}>
+                  {['', 'Jugador', 'Estado', 'Método', 'Monto', ''].map((h, idx) => (
+                    <div key={idx} style={{ color: '#6666a0', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', paddingBottom: 6 }}>{h}</div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {isSuma && loadingJugadores ? (
               <div style={{ padding: 32, textAlign: 'center', color: '#9999b0' }}>Cargando jugadores...</div>
@@ -366,8 +395,9 @@ function AddDuplasModal({ torneoId, torneoNombre, torneoEstado, torneoTipoTorneo
 }
 
 function NewTorneoModal({ onClose, onCreated }) {
+  const isMobile = useIsMobile()
   const [form, setForm] = useState({
-    nombre: '', tipoTorneo: 'categoria', categoriaId: 'cat-8va',
+    nombre: '', tipoTorneo: 'categoria', modalidadTorneo: 'tradicional', categoriaId: 'cat-8va',
     sumaValor: '', fechaInicio: '', costoPorJugador: '', sexo: 'masculino',
     tamanoZona: 4, clasificadosPorZona: 1,
   })
@@ -408,6 +438,7 @@ function NewTorneoModal({ onClose, onCreated }) {
       costoPorJugador: form.costoPorJugador || 0,
       fechaInicio: form.fechaInicio,
       tipoTorneo: form.tipoTorneo,
+      modalidadTorneo: form.modalidadTorneo,
       color,
       sexo: form.sexo,
       tamanoZona: form.tamanoZona,
@@ -433,12 +464,12 @@ function NewTorneoModal({ onClose, onCreated }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }}>
-      <div style={{ background: '#1a1a22', borderRadius: 14, border: '1px solid #2a2a38', width: '100%', maxWidth: 520 }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #2a2a38', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ background: '#1a1a22', borderRadius: 14, border: '1px solid #2a2a38', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #2a2a38', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <h2 style={{ color: '#f1f1f5', fontSize: 18, fontWeight: 700, margin: 0 }}>Nuevo Torneo</h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#9999b0', cursor: 'pointer', fontSize: 22 }}>×</button>
         </div>
-        <form onSubmit={handleSubmit} style={{ padding: 24 }}>
+        <form onSubmit={handleSubmit} style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
           <div style={{ marginBottom: 18 }}>
             <label style={labelStyle}>Nombre del torneo</label>
             <input
@@ -461,6 +492,19 @@ function NewTorneoModal({ onClose, onCreated }) {
                 Por suma
               </button>
             </div>
+          </div>
+
+          <div style={{ marginBottom: 18 }}>
+            <label style={labelStyle}>Formato del torneo</label>
+            <div style={{ display: 'flex', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, padding: 4, gap: 4 }}>
+              <button type="button" style={toggleStyle(form.modalidadTorneo === 'tradicional')} onClick={() => setForm(p => ({ ...p, modalidadTorneo: 'tradicional' }))}>Tradicional</button>
+              <button type="button" style={toggleStyle(form.modalidadTorneo === 'americano')} onClick={() => setForm(p => ({ ...p, modalidadTorneo: 'americano' }))}>Americano</button>
+            </div>
+            {form.modalidadTorneo === 'americano' && (
+              <p style={{ color: '#a78bfa', fontSize: 11, margin: '5px 0 0' }}>
+                Americano: 1 set a 9 games (o diferencia de 2 en paridad).
+              </p>
+            )}
           </div>
 
           <div style={{ marginBottom: 18 }}>
@@ -502,7 +546,7 @@ function NewTorneoModal({ onClose, onCreated }) {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 18 }}>
             <div>
               <label style={labelStyle}>Fecha de inicio</label>
               <input
@@ -528,7 +572,7 @@ function NewTorneoModal({ onClose, onCreated }) {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 18 }}>
             <div>
               <label style={labelStyle}>Parejas por zona</label>
               <div style={{ display: 'flex', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, padding: 4, gap: 4 }}>
@@ -571,10 +615,12 @@ function NewTorneoModal({ onClose, onCreated }) {
 }
 
 function EditTorneoModal({ torneo, onClose, onSaved }) {
+  const isMobile = useIsMobile()
   const isSuma = torneo.tipoTorneo === 'suma'
   const [form, setForm] = useState({
     nombre: torneo.nombre,
     tipoTorneo: isSuma ? 'suma' : 'categoria',
+    modalidadTorneo: torneo.modalidadTorneo || 'tradicional',
     categoriaId: isSuma ? 'cat-8va' : (torneo.categoriaId || 'cat-8va'),
     sumaValor: isSuma ? String(torneo.categoriaValor || '') : '',
     fechaInicio: torneo.fechaInicio || '',
@@ -608,8 +654,9 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
     await updateTorneo(torneo.id, {
       nombre: form.nombre.trim(), categoriaId, categoriaName, categoriaValor,
       costoPorJugador: form.costoPorJugador || 0,
-      fechaInicio: form.fechaInicio, tipoTorneo: form.tipoTorneo, color,
-      sexo: form.sexo,
+      fechaInicio: form.fechaInicio, tipoTorneo: form.tipoTorneo,
+      modalidadTorneo: form.modalidadTorneo,
+      color, sexo: form.sexo,
       tamanoZona: form.tamanoZona,
       clasificadosPorZona: form.clasificadosPorZona,
     })
@@ -626,12 +673,12 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }}>
-      <div style={{ background: '#1a1a22', borderRadius: 14, border: '1px solid #2a2a38', width: '100%', maxWidth: 520 }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #2a2a38', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ background: '#1a1a22', borderRadius: 14, border: '1px solid #2a2a38', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid #2a2a38', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
           <h2 style={{ color: '#f1f1f5', fontSize: 18, fontWeight: 700, margin: 0 }}>Editar Torneo</h2>
           <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#9999b0', cursor: 'pointer', fontSize: 22 }}>×</button>
         </div>
-        <form onSubmit={handleSubmit} style={{ padding: 24 }}>
+        <form onSubmit={handleSubmit} style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
           <div style={{ marginBottom: 18 }}>
             <label style={labelStyle}>Nombre del torneo</label>
             <input value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} style={inputStyle}
@@ -643,6 +690,18 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
               <button type="button" style={toggleStyle(form.tipoTorneo === 'categoria')} onClick={() => setForm(p => ({ ...p, tipoTorneo: 'categoria' }))}>Por categoría</button>
               <button type="button" style={toggleStyle(form.tipoTorneo === 'suma')} onClick={() => setForm(p => ({ ...p, tipoTorneo: 'suma' }))}>Por suma</button>
             </div>
+          </div>
+          <div style={{ marginBottom: 18 }}>
+            <label style={labelStyle}>Formato del torneo</label>
+            <div style={{ display: 'flex', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, padding: 4, gap: 4 }}>
+              <button type="button" style={toggleStyle(form.modalidadTorneo === 'tradicional')} onClick={() => setForm(p => ({ ...p, modalidadTorneo: 'tradicional' }))}>Tradicional</button>
+              <button type="button" style={toggleStyle(form.modalidadTorneo === 'americano')} onClick={() => setForm(p => ({ ...p, modalidadTorneo: 'americano' }))}>Americano</button>
+            </div>
+            {form.modalidadTorneo === 'americano' && (
+              <p style={{ color: '#a78bfa', fontSize: 11, margin: '5px 0 0' }}>
+                Americano: 1 set a 9 games (o diferencia de 2 en paridad).
+              </p>
+            )}
           </div>
           <div style={{ marginBottom: 18 }}>
             <label style={labelStyle}>Modalidad</label>
@@ -666,7 +725,7 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
                 onFocus={e => e.target.style.borderColor = '#f97316'} onBlur={e => e.target.style.borderColor = '#2a2a38'} />
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 18 }}>
             <div>
               <label style={labelStyle}>Fecha de inicio</label>
               <input type="date" value={form.fechaInicio} onChange={e => setForm(p => ({ ...p, fechaInicio: e.target.value }))} style={inputStyle}
@@ -678,7 +737,7 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
                 onFocus={e => e.target.style.borderColor = '#f97316'} onBlur={e => e.target.style.borderColor = '#2a2a38'} />
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 18 }}>
             <div>
               <label style={labelStyle}>Parejas por zona</label>
               <div style={{ display: 'flex', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, padding: 4, gap: 4 }}>
@@ -721,6 +780,7 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
 export default function TorneosAdmin() {
   const [torneos, setTorneos] = useState([])
   const [loading, setLoading] = useState(true)
+  const [selected, setSelected] = useState(null)
   const [showNew, setShowNew] = useState(false)
   const [duplasModal, setDuplasModal] = useState(null)
   const [editModal, setEditModal] = useState(null)
@@ -736,7 +796,9 @@ export default function TorneosAdmin() {
   async function load() {
     setLoading(true)
     const snap = await getDocs(query(collection(db, 'torneos'), orderBy('createdAt', 'desc')))
-    setTorneos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    setTorneos(list)
+    setSelected(prev => prev ? (list.find(t => t.id === prev.id) ?? null) : null)
     setLoading(false)
   }
 
@@ -745,6 +807,7 @@ export default function TorneosAdmin() {
     await deleteTorneo(id)
     setDeleting(false)
     setConfirmDelete(null)
+    setSelected(null)
     load()
   }
 
@@ -781,115 +844,187 @@ export default function TorneosAdmin() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h2 style={{ color: '#f1f1f5', fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Torneos</h2>
-          <p style={{ color: '#9999b0', fontSize: 13, margin: 0 }}>
-            {torneos.length} torneo{torneos.length !== 1 ? 's' : ''} · {enCurso} en curso · {inscripcion} en inscripción
-          </p>
-        </div>
-        <button
-          onClick={() => setShowNew(true)}
-          style={{ background: '#f97316', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: '0 0 16px rgba(249,115,22,0.3)' }}
-        >
-          + Nuevo Torneo
-        </button>
-      </div>
+      {selected ? (
+        /* ── DETAIL VIEW ── */
+        (() => {
+          const t = selected
+          const col = getTorneoColor(t)
+          const st = STATUS_STYLE[t.estado] || STATUS_STYLE['Inscripción']
+          const sexoLabel = { masculino: '♂ Masculino', femenino: '♀ Femenino', mixto: '⊕ Mixto' }[t.sexo] || t.sexo
+          return (
+            <div>
+              <button
+                onClick={() => setSelected(null)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', border: 'none', color: '#9999b0', cursor: 'pointer', fontSize: 13, padding: '4px 0', marginBottom: 20 }}
+                onMouseEnter={e => e.currentTarget.style.color = '#f1f1f5'}
+                onMouseLeave={e => e.currentTarget.style.color = '#9999b0'}
+              >
+                ← Torneos
+              </button>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
-        {[
-          { label: 'Total', value: torneos.length, color: '#f97316' },
-          { label: 'En curso', value: enCurso, color: '#22c55e' },
-          { label: 'Inscripción', value: inscripcion, color: '#f97316' },
-        ].map(s => (
-          <div key={s.label} style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ color: '#f1f1f5', fontSize: 28, fontWeight: 800 }}>{s.value}</div>
-            <div style={{ color: '#9999b0', fontSize: 12 }}>{s.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {torneos.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 48, background: '#13131a', borderRadius: 12, border: '1px dashed #2a2a38', color: '#9999b0' }}>
-          <div style={{ fontSize: 36, marginBottom: 10 }}>🏆</div>
-          <p style={{ margin: 0, fontSize: 14 }}>Creá el primer torneo con "+ Nuevo Torneo"</p>
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 14 }}>
-          {torneos.map(t => {
-            const col = getTorneoColor(t)
-            const st = STATUS_STYLE[t.estado] || STATUS_STYLE['Inscripción']
-            return (
-              <div key={t.id} style={{ background: '#13131a', borderRadius: 12, border: '1px solid #2a2a38', overflow: 'hidden' }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = col}
-                onMouseLeave={e => e.currentTarget.style.borderColor = '#2a2a38'}>
-                <div style={{ height: 3, background: col }} />
-                <div style={{ padding: 18 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <h3 style={{ color: '#f1f1f5', fontSize: 14, fontWeight: 700, margin: 0, flex: 1, paddingRight: 10, lineHeight: 1.4 }}>{t.nombre}</h3>
-                    <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: st.bg, color: st.color, border: `1px solid ${st.border}`, whiteSpace: 'nowrap' }}>{t.estado}</span>
+              <div style={{ marginBottom: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ height: 3, width: 36, background: col, borderRadius: 2, marginBottom: 10 }} />
+                    <h2 style={{ color: '#f1f1f5', fontSize: 22, fontWeight: 700, margin: '0 0 8px' }}>{t.nombre}</h2>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-                    <span style={{ padding: '2px 8px', borderRadius: 20, background: `${col}18`, border: `1px solid ${col}40`, color: col, fontSize: 11, fontWeight: 600 }}>{t.categoriaName}</span>
-                    {t.fechaInicio && <span style={{ color: '#9999b0', fontSize: 12, display: 'flex', alignItems: 'center' }}>📅 {t.fechaInicio}</span>}
-                  </div>
-                  <div style={{ display: 'flex', gap: 16, paddingTop: 12, borderTop: '1px solid #2a2a38', marginBottom: 14 }}>
-                    <div><div style={{ color: '#f1f1f5', fontSize: 16, fontWeight: 800 }}>{t.zonas ?? '—'}</div><div style={{ color: '#9999b0', fontSize: 11 }}>Zonas</div></div>
-                    <div><div style={{ color: '#f1f1f5', fontSize: 16, fontWeight: 800 }}>{t.tamanoZona || 4}</div><div style={{ color: '#9999b0', fontSize: 11 }}>por zona</div></div>
-                    <div><div style={{ color: '#f1f1f5', fontSize: 16, fontWeight: 800 }}>{t.clasificadosPorZona || 1}</div><div style={{ color: '#9999b0', fontSize: 11 }}>clasifican</div></div>
-                    <div><div style={{ color: '#f1f1f5', fontSize: 16, fontWeight: 800 }}>{t.costoPorJugador ? `$${Number(t.costoPorJugador).toLocaleString()}` : '—'}</div><div style={{ color: '#9999b0', fontSize: 11 }}>$/jugador</div></div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: st.bg, color: st.color, border: `1px solid ${st.border}` }}>{t.estado}</span>
                     <button
                       onClick={() => setEditModal(t)}
-                      style={{ flex: 1, background: 'rgba(255,255,255,0.05)', border: '1px solid #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 12, fontWeight: 500, padding: '7px 0', cursor: 'pointer', transition: 'all 0.15s' }}
+                      style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 12, padding: '6px 14px', cursor: 'pointer', transition: 'all 0.15s' }}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = '#f97316'; e.currentTarget.style.color = '#f97316' }}
                       onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a38'; e.currentTarget.style.color = '#9999b0' }}
                     >✎ Editar</button>
-                    <button
-                      onClick={() => setConfirmDelete(t)}
-                      style={{ width: 36, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 8, color: '#ef4444', fontSize: 14, cursor: 'pointer', transition: 'all 0.15s' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.2)' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)' }}
-                    >🗑</button>
                   </div>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <button
-                      onClick={() => setDuplasModal({ id: t.id, nombre: t.nombre, estado: t.estado, tipoTorneo: t.tipoTorneo, categoriaValor: t.categoriaValor, sexo: t.sexo, costoPorJugador: t.costoPorJugador })}
-                      style={{ flex: 1, background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 8, color: '#f97316', fontSize: 12, fontWeight: 600, padding: '8px 0', cursor: 'pointer', transition: 'all 0.15s' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = '#f97316'; e.currentTarget.style.color = '#fff' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(249,115,22,0.1)'; e.currentTarget.style.color = '#f97316' }}
-                    >
-                      👥 Agregar duplas
-                    </button>
-                    <button
-                      onClick={() => setFixtureConfirm(t)}
-                      style={{ flex: 1, background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 8, color: '#8b5cf6', fontSize: 12, fontWeight: 600, padding: '8px 0', cursor: 'pointer', transition: 'all 0.15s' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = '#8b5cf6'; e.currentTarget.style.color = '#fff' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.1)'; e.currentTarget.style.color = '#8b5cf6' }}
-                    >
-                      ⚡ Generar fixture
-                    </button>
-                  </div>
-                  {t.estado === 'Llave' && (
-                    <div style={{ marginTop: 6 }}>
-                      <button
-                        onClick={() => setLlaveConfirm(t)}
-                        style={{ width: '100%', background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 8, color: '#10b981', fontSize: 12, fontWeight: 600, padding: '8px 0', cursor: 'pointer', transition: 'all 0.15s' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = '#10b981'; e.currentTarget.style.color = '#fff' }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.08)'; e.currentTarget.style.color = '#10b981' }}
-                      >
-                        🏅 Regenerar llave
-                      </button>
-                    </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <span style={{ padding: '3px 10px', borderRadius: 20, background: `${col}18`, border: `1px solid ${col}40`, color: col, fontSize: 12, fontWeight: 600 }}>{t.categoriaName}</span>
+                  <span style={{ color: '#9999b0', fontSize: 12 }}>{sexoLabel}</span>
+                  {t.modalidadTorneo === 'americano' && (
+                    <span style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.35)', color: '#a78bfa', fontSize: 12, fontWeight: 600 }}>Americano</span>
                   )}
+                  {t.fechaInicio && <span style={{ color: '#9999b0', fontSize: 12 }}>📅 {t.fechaInicio}</span>}
+                  {t.costoPorJugador > 0 && <span style={{ color: '#9999b0', fontSize: 12 }}>💰 ${Number(t.costoPorJugador).toLocaleString()} / jugador</span>}
                 </div>
               </div>
-            )
-          })}
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10, marginBottom: 28 }}>
+                {[
+                  { label: 'Zonas', value: t.zonas ?? '—' },
+                  { label: 'Parejas / zona', value: t.tamanoZona || 4 },
+                  { label: 'Clasifican', value: t.clasificadosPorZona || 1 },
+                  { label: 'Costo / jugador', value: t.costoPorJugador ? `$${Number(t.costoPorJugador).toLocaleString()}` : '—' },
+                ].map(s => (
+                  <div key={s.label} style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 10, padding: '14px 16px' }}>
+                    <div style={{ color: '#f1f1f5', fontSize: 22, fontWeight: 800, lineHeight: 1, marginBottom: 4 }}>{s.value}</div>
+                    <div style={{ color: '#9999b0', fontSize: 11 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ color: '#9999b0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 12 }}>Acciones</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, marginBottom: 32 }}>
+                <button
+                  onClick={() => setDuplasModal({ id: t.id, nombre: t.nombre, estado: t.estado, tipoTorneo: t.tipoTorneo, categoriaValor: t.categoriaValor, sexo: t.sexo, costoPorJugador: t.costoPorJugador })}
+                  style={{ background: '#13131a', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 12, padding: '18px 20px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(249,115,22,0.08)'; e.currentTarget.style.borderColor = '#f97316' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#13131a'; e.currentTarget.style.borderColor = 'rgba(249,115,22,0.3)' }}
+                >
+                  <div style={{ fontSize: 22, marginBottom: 8 }}>👥</div>
+                  <div style={{ color: '#f97316', fontSize: 14, fontWeight: 700, marginBottom: 3 }}>Agregar duplas</div>
+                  <div style={{ color: '#9999b0', fontSize: 12 }}>Inscribir parejas al torneo</div>
+                </button>
+                <button
+                  onClick={() => setFixtureConfirm(t)}
+                  style={{ background: '#13131a', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 12, padding: '18px 20px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.borderColor = '#8b5cf6' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#13131a'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.3)' }}
+                >
+                  <div style={{ fontSize: 22, marginBottom: 8 }}>⚡</div>
+                  <div style={{ color: '#8b5cf6', fontSize: 14, fontWeight: 700, marginBottom: 3 }}>Generar fixture</div>
+                  <div style={{ color: '#9999b0', fontSize: 12 }}>Crear zonas y cruces automáticamente</div>
+                </button>
+                {t.estado === 'Llave' && (
+                  <button
+                    onClick={() => setLlaveConfirm(t)}
+                    style={{ background: '#13131a', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 12, padding: '18px 20px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.08)'; e.currentTarget.style.borderColor = '#10b981' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#13131a'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.3)' }}
+                  >
+                    <div style={{ fontSize: 22, marginBottom: 8 }}>🏅</div>
+                    <div style={{ color: '#10b981', fontSize: 14, fontWeight: 700, marginBottom: 3 }}>Regenerar llave</div>
+                    <div style={{ color: '#9999b0', fontSize: 12 }}>Reconstruir bracket de eliminación</div>
+                  </button>
+                )}
+              </div>
+
+              <div style={{ borderTop: '1px solid #2a2a38', paddingTop: 20 }}>
+                <div style={{ color: '#9999b0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 12 }}>Zona de peligro</div>
+                <button
+                  onClick={() => setConfirmDelete(t)}
+                  style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '11px 20px', cursor: 'pointer', color: '#ef4444', fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 8, transition: 'all 0.15s' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.14)'; e.currentTarget.style.borderColor = '#ef4444' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.06)'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.2)' }}
+                >
+                  🗑 Eliminar torneo
+                </button>
+              </div>
+            </div>
+          )
+        })()
+      ) : (
+        /* ── LIST VIEW ── */
+        <div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <h2 style={{ color: '#f1f1f5', fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Torneos</h2>
+              <p style={{ color: '#9999b0', fontSize: 13, margin: 0 }}>
+                {torneos.length} torneo{torneos.length !== 1 ? 's' : ''} · {enCurso} en curso · {inscripcion} en inscripción
+              </p>
+            </div>
+            <button
+              onClick={() => setShowNew(true)}
+              style={{ background: '#f97316', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: '0 0 16px rgba(249,115,22,0.3)' }}
+            >
+              + Nuevo Torneo
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+            {[
+              { label: 'Total', value: torneos.length },
+              { label: 'En curso', value: enCurso },
+              { label: 'Inscripción', value: inscripcion },
+            ].map(s => (
+              <div key={s.label} style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ color: '#f1f1f5', fontSize: 28, fontWeight: 800 }}>{s.value}</div>
+                <div style={{ color: '#9999b0', fontSize: 12 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {torneos.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 48, background: '#13131a', borderRadius: 12, border: '1px dashed #2a2a38', color: '#9999b0' }}>
+              <div style={{ fontSize: 36, marginBottom: 10 }}>🏆</div>
+              <p style={{ margin: 0, fontSize: 14 }}>Creá el primer torneo con "+ Nuevo Torneo"</p>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+              {torneos.map(t => {
+                const col = getTorneoColor(t)
+                const st = STATUS_STYLE[t.estado] || STATUS_STYLE['Inscripción']
+                return (
+                  <div
+                    key={t.id}
+                    onClick={() => setSelected(t)}
+                    style={{ background: '#13131a', borderRadius: 12, border: '1px solid #2a2a38', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s' }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = col; e.currentTarget.style.background = '#161620' }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a38'; e.currentTarget.style.background = '#13131a' }}
+                  >
+                    <div style={{ height: 3, background: col }} />
+                    <div style={{ padding: '14px 16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <h3 style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 700, margin: 0, flex: 1, paddingRight: 8, lineHeight: 1.4 }}>{t.nombre}</h3>
+                        <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: st.bg, color: st.color, border: `1px solid ${st.border}`, whiteSpace: 'nowrap', flexShrink: 0 }}>{t.estado}</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+                        <span style={{ padding: '2px 7px', borderRadius: 20, background: `${col}18`, border: `1px solid ${col}40`, color: col, fontSize: 10, fontWeight: 600 }}>{t.categoriaName}</span>
+                        {t.fechaInicio && <span style={{ color: '#6666a0', fontSize: 10 }}>📅 {t.fechaInicio}</span>}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                        <span style={{ color: '#555570', fontSize: 11 }}>Ver detalle →</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
+      {/* ── MODALS (always mounted regardless of list/detail view) ── */}
       {showNew && <NewTorneoModal onClose={() => setShowNew(false)} onCreated={handleCreated} />}
       {editModal && <EditTorneoModal torneo={editModal} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); load() }} />}
       {duplasModal && (
@@ -905,26 +1040,17 @@ export default function TorneosAdmin() {
           onFixtureGenerated={load}
         />
       )}
-
       {fixtureConfirm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 20 }}>
           <div style={{ background: '#1a1a22', border: '1px solid #2a2a38', borderRadius: 14, padding: 32, maxWidth: 380, width: '100%', textAlign: 'center' }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>⚡</div>
             <h3 style={{ color: '#f1f1f5', fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>¿Generar fixture?</h3>
-            <p style={{ color: '#9999b0', fontSize: 14, margin: '0 0 6px' }}>
-              <strong style={{ color: '#f1f1f5' }}>{fixtureConfirm.nombre}</strong>
-            </p>
+            <p style={{ color: '#9999b0', fontSize: 14, margin: '0 0 6px' }}><strong style={{ color: '#f1f1f5' }}>{fixtureConfirm.nombre}</strong></p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 10 }}>
-              <span style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.25)', color: '#f97316', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>
-                {fixtureConfirm.tamanoZona || 4} parejas / zona
-              </span>
-              <span style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', color: '#8b5cf6', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>
-                {fixtureConfirm.clasificadosPorZona || 1} clasifican
-              </span>
+              <span style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.25)', color: '#f97316', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>{fixtureConfirm.tamanoZona || 4} parejas / zona</span>
+              <span style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', color: '#8b5cf6', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>{fixtureConfirm.clasificadosPorZona || 1} clasifican</span>
             </div>
-            <p style={{ color: '#9999b0', fontSize: 13, margin: '0 0 24px' }}>
-              Se generarán las zonas y cruces automáticamente. Si ya existía un fixture, será reemplazado.
-            </p>
+            <p style={{ color: '#9999b0', fontSize: 13, margin: '0 0 24px' }}>Se generarán las zonas y cruces automáticamente. Si ya existía un fixture, será reemplazado.</p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button onClick={() => setFixtureConfirm(null)} disabled={generatingFixture} style={{ background: 'transparent', border: '1px solid #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 13, padding: '9px 20px', cursor: 'pointer' }}>Cancelar</button>
               <button onClick={() => handleGenerateFixture(fixtureConfirm.id)} disabled={generatingFixture} style={{ background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: generatingFixture ? 'wait' : 'pointer', opacity: generatingFixture ? 0.7 : 1 }}>
@@ -934,26 +1060,17 @@ export default function TorneosAdmin() {
           </div>
         </div>
       )}
-
       {llaveConfirm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 20 }}>
           <div style={{ background: '#1a1a22', border: '1px solid #2a2a38', borderRadius: 14, padding: 32, maxWidth: 380, width: '100%', textAlign: 'center' }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>🏅</div>
             <h3 style={{ color: '#f1f1f5', fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>¿Generar llave?</h3>
-            <p style={{ color: '#9999b0', fontSize: 14, margin: '0 0 6px' }}>
-              <strong style={{ color: '#f1f1f5' }}>{llaveConfirm.nombre}</strong>
-            </p>
+            <p style={{ color: '#9999b0', fontSize: 14, margin: '0 0 6px' }}><strong style={{ color: '#f1f1f5' }}>{llaveConfirm.nombre}</strong></p>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
-              <span style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#10b981', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>
-                {(llaveConfirm.zonas || 1)} zona{(llaveConfirm.zonas || 1) !== 1 ? 's' : ''}
-              </span>
-              <span style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', color: '#8b5cf6', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>
-                {llaveConfirm.clasificadosPorZona || 1} clasifican / zona
-              </span>
+              <span style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#10b981', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>{(llaveConfirm.zonas || 1)} zona{(llaveConfirm.zonas || 1) !== 1 ? 's' : ''}</span>
+              <span style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', color: '#8b5cf6', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>{llaveConfirm.clasificadosPorZona || 1} clasifican / zona</span>
             </div>
-            <p style={{ color: '#9999b0', fontSize: 13, margin: '0 0 24px' }}>
-              Se arma el bracket con los clasificados de la fase de grupos. Si ya existía una llave, será reemplazada.
-            </p>
+            <p style={{ color: '#9999b0', fontSize: 13, margin: '0 0 24px' }}>Se arma el bracket con los clasificados de la fase de grupos. Si ya existía una llave, será reemplazada.</p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button onClick={() => setLlaveConfirm(null)} disabled={generatingLlave} style={{ background: 'transparent', border: '1px solid #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 13, padding: '9px 20px', cursor: 'pointer' }}>Cancelar</button>
               <button onClick={() => handleGenerateLlave(llaveConfirm.id)} disabled={generatingLlave} style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: generatingLlave ? 'wait' : 'pointer', opacity: generatingLlave ? 0.7 : 1 }}>
@@ -963,18 +1080,13 @@ export default function TorneosAdmin() {
           </div>
         </div>
       )}
-
       {confirmDelete && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 20 }}>
           <div style={{ background: '#1a1a22', border: '1px solid #2a2a38', borderRadius: 14, padding: 32, maxWidth: 380, width: '100%', textAlign: 'center' }}>
             <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
             <h3 style={{ color: '#f1f1f5', fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>¿Eliminar torneo?</h3>
-            <p style={{ color: '#9999b0', fontSize: 14, margin: '0 0 6px' }}>
-              <strong style={{ color: '#f1f1f5' }}>{confirmDelete.nombre}</strong>
-            </p>
-            <p style={{ color: '#ef4444', fontSize: 13, margin: '0 0 24px' }}>
-              Se eliminarán también todas las duplas, zonas y partidos. Esta acción no se puede deshacer.
-            </p>
+            <p style={{ color: '#9999b0', fontSize: 14, margin: '0 0 6px' }}><strong style={{ color: '#f1f1f5' }}>{confirmDelete.nombre}</strong></p>
+            <p style={{ color: '#ef4444', fontSize: 13, margin: '0 0 24px' }}>Se eliminarán también todas las duplas, zonas y partidos. Esta acción no se puede deshacer.</p>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
               <button onClick={() => setConfirmDelete(null)} style={{ background: 'transparent', border: '1px solid #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 13, padding: '9px 20px', cursor: 'pointer' }}>Cancelar</button>
               <button onClick={() => handleDelete(confirmDelete.id)} disabled={deleting} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: deleting ? 'wait' : 'pointer', opacity: deleting ? 0.7 : 1 }}>

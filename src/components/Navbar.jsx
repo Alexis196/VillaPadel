@@ -6,11 +6,8 @@ import { signOutUser } from '../firebase/auth'
 import { useIsMobile } from '../hooks/useIsMobile'
 
 const navItems = [
-  { to: '/torneos',  label: 'Torneos',   icon: '🏆' },
-  { to: '/tabla',    label: 'Tabla',     icon: '📊' },
-  { to: '/partidos', label: 'Partidos',  icon: '🎾' },
-  { to: '/llave',    label: 'Llave',     icon: '🏅' },
-  { to: '/jugadores', label: 'Jugadores', icon: '👤' },
+  { to: '/',        label: 'Inicio',   icon: '🏠', end: true },
+  { to: '/torneos', label: 'Torneos',  icon: '🏆', end: false },
 ]
 
 function UserMenu({ user, isAdmin }) {
@@ -29,7 +26,6 @@ function UserMenu({ user, isAdmin }) {
   async function handleLogout() {
     setOpen(false)
     await signOutUser()
-  
   }
 
   return (
@@ -90,31 +86,40 @@ export default function Navbar() {
   const { user, isAdmin } = useAuth()
   const navigate = useNavigate()
   const isMobile = useIsMobile()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const drawerRef = useRef(null)
+
+  useEffect(() => {
+    function outside(e) {
+      if (drawerRef.current && !drawerRef.current.contains(e.target)) setDrawerOpen(false)
+    }
+    if (drawerOpen) document.addEventListener('mousedown', outside)
+    return () => document.removeEventListener('mousedown', outside)
+  }, [drawerOpen])
 
   return (
     <>
-      <header style={{ background: '#13131a', borderBottom: '1px solid #2a2a38' }}>
+      <header style={{ background: '#13131a', borderBottom: '1px solid #2a2a38', position: 'relative', zIndex: 100 }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52 }}>
 
-            {/* Logo */}
-            <div style={{
-              width: isMobile ? 72 : 100, height: isMobile ? 38 : 50,
-              background: '#ffffff', borderRadius: 6,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 0 8px 2px rgba(255,255,255,0.6)',
-              flexShrink: 0,
-            }}>
-              <img src={Logo} alt="logo" style={{ width: '85%', height: '85%', objectFit: 'contain' }} />
-            </div>
+            {/* Logo → landing */}
+            <NavLink to="/" style={{ textDecoration: 'none', flexShrink: 0, lineHeight: 0 }}>
+              <img
+                src={Logo}
+                alt="VillaPadel"
+                style={{ height: isMobile ? 36 : 44, width: 'auto', borderRadius: 6, display: 'block' }}
+              />
+            </NavLink>
 
-            {/* Desktop nav — hidden on mobile */}
+            {/* Desktop nav */}
             {!isMobile && (
               <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                {navItems.map(({ to, label }) => (
+                {navItems.map(({ to, label, end }) => (
                   <NavLink
                     key={to}
                     to={to}
+                    end={end}
                     style={({ isActive }) => ({
                       padding: '6px 16px', borderRadius: 6, fontSize: 13, fontWeight: 500,
                       textDecoration: 'none', transition: 'all 0.15s',
@@ -128,8 +133,26 @@ export default function Navbar() {
               </nav>
             )}
 
-            {/* Right: user or login */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {/* Right: hamburger (mobile) + user/login */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {isMobile && (
+                <button
+                  onClick={() => setDrawerOpen(v => !v)}
+                  style={{
+                    background: drawerOpen ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${drawerOpen ? '#f97316' : '#2a2a38'}`,
+                    borderRadius: 8, color: drawerOpen ? '#f97316' : '#9999b0',
+                    width: 36, height: 36, cursor: 'pointer',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+                    transition: 'all 0.15s', padding: 0, flexShrink: 0,
+                  }}
+                  aria-label="Menú"
+                >
+                  <span style={{ width: 16, height: 2, background: 'currentColor', borderRadius: 2, display: 'block' }} />
+                  <span style={{ width: 16, height: 2, background: 'currentColor', borderRadius: 2, display: 'block' }} />
+                  <span style={{ width: 16, height: 2, background: 'currentColor', borderRadius: 2, display: 'block' }} />
+                </button>
+              )}
               {user ? (
                 <UserMenu user={user} isAdmin={isAdmin} />
               ) : (
@@ -147,33 +170,66 @@ export default function Navbar() {
         </div>
       </header>
 
-      {/* Mobile bottom nav */}
+      {/* Mobile side drawer */}
       {isMobile && (
-        <nav style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200,
-          background: '#13131a', borderTop: '1px solid #2a2a38',
-          display: 'flex',
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        }}>
-          {navItems.map(({ to, label, icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              style={({ isActive }) => ({
-                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                padding: '8px 2px 6px',
-                textDecoration: 'none',
-                color: isActive ? '#f97316' : '#6666a0',
-                fontSize: 10, fontWeight: isActive ? 600 : 400,
-                borderTop: `2px solid ${isActive ? '#f97316' : 'transparent'}`,
-                transition: 'color 0.15s',
-              })}
-            >
-              <span style={{ fontSize: 19, marginBottom: 2, lineHeight: 1 }}>{icon}</span>
-              {label}
-            </NavLink>
-          ))}
-        </nav>
+        <>
+          {drawerOpen && (
+            <div
+              onClick={() => setDrawerOpen(false)}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', zIndex: 299 }}
+            />
+          )}
+
+          <div
+            ref={drawerRef}
+            style={{
+              position: 'fixed', top: 0, left: 0, bottom: 0, width: 240,
+              background: '#13131a', borderRight: '1px solid #2a2a38',
+              zIndex: 300, display: 'flex', flexDirection: 'column',
+              transform: drawerOpen ? 'translateX(0)' : 'translateX(-100%)',
+              transition: 'transform 0.25s ease',
+              paddingTop: 60,
+            }}
+          >
+            <nav style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
+              {navItems.map(({ to, label, icon, end }) => (
+                <NavLink
+                  key={to}
+                  to={to}
+                  end={end}
+                  onClick={() => setDrawerOpen(false)}
+                  style={({ isActive }) => ({
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '12px 14px', borderRadius: 8, marginBottom: 4,
+                    textDecoration: 'none', fontSize: 14, fontWeight: isActive ? 600 : 400,
+                    background: isActive ? 'rgba(249,115,22,0.12)' : 'transparent',
+                    color: isActive ? '#f97316' : '#9999b0',
+                    transition: 'all 0.15s',
+                  })}
+                >
+                  <span style={{ fontSize: 18 }}>{icon}</span>
+                  {label}
+                </NavLink>
+              ))}
+            </nav>
+
+            <div style={{ padding: '12px 10px', borderTop: '1px solid #2a2a38' }}>
+              {isAdmin && (
+                <button
+                  onClick={() => { setDrawerOpen(false); navigate('/admin') }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                    padding: '10px 14px', borderRadius: 8, marginBottom: 6,
+                    background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.3)',
+                    color: '#f97316', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  }}
+                >
+                  ⚙️ Panel Admin
+                </button>
+              )}
+            </div>
+          </div>
+        </>
       )}
     </>
   )

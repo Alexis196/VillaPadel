@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useCollection } from '../../hooks/useFirestore'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import Spinner from '../ui/Spinner'
+import ShareButton from '../ui/ShareButton'
 
 const CAT_FILTERS = [
   { id: 'all', label: 'Todas' },
@@ -37,13 +38,20 @@ function CategoryBadge({ name, color, valor }) {
 export default function PlayersView() {
   const { data: players, loading } = useCollection('players')
   const isMobile = useIsMobile()
+  const shareRef = useRef(null)
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('all')
   const [filterSexo, setFilterSexo] = useState('all')
+  const [filterLocalidad, setFilterLocalidad] = useState('all')
   const [pageSize, setPageSize] = useState(25)
   const [page, setPage] = useState(1)
 
   const CAT_PREFIX = { 'cat-1ra': '1ra', 'cat-2da': '2da', 'cat-3ra': '3ra', 'cat-4ta': '4ta', 'cat-5ta': '5ta', 'cat-6ta': '6ta', 'cat-7ma': '7ma', 'cat-8va': '8va' }
+
+  const localidades = useMemo(() => {
+    const set = new Set(players.filter(p => p.localidad).map(p => p.localidad))
+    return [...set].sort()
+  }, [players])
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -53,10 +61,11 @@ export default function PlayersView() {
         if (q && !p.name.toLowerCase().includes(q) && !p.categoryName?.toLowerCase().includes(q)) return false
         if (catPrefix && !p.categoryName?.startsWith(catPrefix)) return false
         if (filterSexo !== 'all' && p.sexo !== filterSexo) return false
+        if (filterLocalidad !== 'all' && p.localidad !== filterLocalidad) return false
         return true
       })
       .sort((a, b) => a.name.localeCompare(b.name))
-  }, [players, search, filterCat, filterSexo])
+  }, [players, search, filterCat, filterSexo, filterLocalidad])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -65,30 +74,24 @@ export default function PlayersView() {
   function resetPage() { setPage(1) }
   function handleSearch(val) { setSearch(val); resetPage() }
   function handleFilterCat(val) { setFilterCat(val); resetPage() }
-  function handleFilterSexo(val) { setFilterSexo(val === filterSexo ? 'all' : val); resetPage() }
+  function handleFilterSexo(val) { setFilterSexo(val); resetPage() }
   function handlePageSize(val) { setPageSize(val); resetPage() }
 
   if (loading) return <Spinner />
 
-  const filterBtn = (active, label, onClick) => (
-    <button onClick={onClick} style={{
-      padding: '5px 11px', borderRadius: 6, border: '1px solid', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s',
-      background: active ? '#f97316' : 'transparent',
-      color: active ? '#fff' : '#9999b0',
-      borderColor: active ? '#f97316' : '#2a2a38',
-    }}>{label}</button>
-  )
-
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: isMobile ? '20px 12px' : '32px 24px' }}>
       {/* Header */}
-      <div style={{ marginBottom: 20 }}>
-        <h1 style={{ color: '#f1f1f5', fontSize: isMobile ? 22 : 28, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.5px' }}>
-          Jugadores
-        </h1>
-        <p style={{ color: '#9999b0', fontSize: 14, margin: 0 }}>
-          {filtered.length} de {players.length} jugadores
-        </p>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h1 style={{ color: '#f1f1f5', fontSize: isMobile ? 22 : 28, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.5px' }}>
+            Categorización
+          </h1>
+          <p style={{ color: '#9999b0', fontSize: 14, margin: 0 }}>
+            {filtered.length} de {players.length} jugadores
+          </p>
+        </div>
+        <ShareButton targetRef={shareRef} title="Categorización" filename="categorizacion" />
       </div>
 
       {/* Search + filters */}
@@ -113,24 +116,50 @@ export default function PlayersView() {
         {/* Cross-filters row */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Category filter */}
-          <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-            {CAT_FILTERS.map(c => filterBtn(filterCat === c.id, c.label, () => handleFilterCat(c.id)))}
-          </div>
-          <div style={{ width: 1, height: 20, background: '#2a2a38', flexShrink: 0 }} />
+          <span style={{ color: '#6666a0', fontSize: 11, fontWeight: 600 }}>CATEGORÍA</span>
+          <select
+            value={filterCat}
+            onChange={e => handleFilterCat(e.target.value)}
+            style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 6, color: '#f1f1f5', fontSize: 12, padding: '5px 10px', cursor: 'pointer', outline: 'none' }}
+          >
+            <option value="all">Todas</option>
+            {CAT_FILTERS.slice(1).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+          </select>
           {/* Sexo filter */}
-          <div style={{ display: 'flex', gap: 3 }}>
-            {filterBtn(filterSexo === 'M', 'Masculino', () => handleFilterSexo('M'))}
-            {filterBtn(filterSexo === 'F', 'Femenino', () => handleFilterSexo('F'))}
-          </div>
-          {/* Page size (desktop only) */}
-          {!isMobile && (
+          <span style={{ color: '#6666a0', fontSize: 11, fontWeight: 600 }}>SEXO</span>
+          <select
+            value={filterSexo}
+            onChange={e => handleFilterSexo(e.target.value)}
+            style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 6, color: '#f1f1f5', fontSize: 12, padding: '5px 10px', cursor: 'pointer', outline: 'none' }}
+          >
+            <option value="all">Todos</option>
+            <option value="M">Masculino</option>
+            <option value="F">Femenino</option>
+          </select>
+          {/* Localidad filter */}
+          {localidades.length > 0 && (
             <>
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
-                {[10, 25, 50].map(n => (
-                  <button key={n} onClick={() => handlePageSize(n)} style={{ padding: '5px 11px', borderRadius: 6, border: '1px solid', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: pageSize === n ? '#f97316' : 'transparent', color: pageSize === n ? '#fff' : '#9999b0', borderColor: pageSize === n ? '#f97316' : '#2a2a38' }}>{n}</button>
-                ))}
+              <div style={{ width: 1, height: 20, background: '#2a2a38', flexShrink: 0 }} />
+              <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                <select
+                  value={filterLocalidad}
+                  onChange={e => { setFilterLocalidad(e.target.value); resetPage() }}
+                  style={{ background: '#13131a', border: `1px solid ${filterLocalidad !== 'all' ? '#f97316' : '#2a2a38'}`, borderRadius: 6, color: filterLocalidad !== 'all' ? '#f97316' : '#9999b0', fontSize: 12, fontWeight: 600, padding: '5px 28px 5px 10px', cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none' }}
+                >
+                  <option value="all">Localidad</option>
+                  {localidades.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+                <span style={{ position: 'absolute', right: 8, pointerEvents: 'none', color: filterLocalidad !== 'all' ? '#f97316' : '#9999b0', fontSize: 10 }}>▾</span>
               </div>
             </>
+          )}
+          {/* Page size (desktop only) */}
+          {!isMobile && (
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+              {[10, 25, 50].map(n => (
+                <button key={n} onClick={() => handlePageSize(n)} style={{ padding: '5px 11px', borderRadius: 6, border: '1px solid', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: pageSize === n ? '#f97316' : 'transparent', color: pageSize === n ? '#fff' : '#9999b0', borderColor: pageSize === n ? '#f97316' : '#2a2a38' }}>{n}</button>
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -141,13 +170,16 @@ export default function PlayersView() {
         </div>
       ) : isMobile ? (
         /* Mobile: card grid */
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <div ref={shareRef} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           {paginated.map((player, idx) => (
             <div key={player.id} style={{ background: '#1a1a22', borderRadius: 10, border: '1px solid #2a2a38', padding: '12px 14px' }}>
               <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 13, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
                 {player.name}
                 {player.ascenso && <span style={{ color: '#22c55e', fontSize: 12, fontWeight: 700 }}>↑</span>}
               </div>
+              {player.localidad && (
+                <div style={{ color: '#6666a0', fontSize: 11, marginBottom: 5 }}>{player.localidad}</div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 20,
@@ -170,10 +202,11 @@ export default function PlayersView() {
         </div>
       ) : (
         /* Desktop: table */
-        <div style={{ background: '#1a1a22', borderRadius: 12, border: '1px solid #2a2a38', overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr 220px', alignItems: 'center', padding: '0 20px', height: 42, borderBottom: '1px solid #2a2a38', background: '#16161e', gap: 12 }}>
+        <div ref={shareRef} style={{ background: '#1a1a22', borderRadius: 12, border: '1px solid #2a2a38', overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr 130px 220px', alignItems: 'center', padding: '0 20px', height: 42, borderBottom: '1px solid #2a2a38', background: '#16161e', gap: 12 }}>
             <div style={{ color: '#6666a0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>#</div>
             <div style={{ color: '#6666a0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Jugador</div>
+            <div style={{ color: '#6666a0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Localidad</div>
             <div style={{ color: '#6666a0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Categoría</div>
           </div>
           {paginated.map((player, idx) => {
@@ -181,7 +214,7 @@ export default function PlayersView() {
             return (
               <div
                 key={player.id}
-                style={{ display: 'grid', gridTemplateColumns: '48px 1fr 220px', alignItems: 'center', padding: '0 20px', height: 54, borderBottom: idx < paginated.length - 1 ? '1px solid #20202c' : 'none', gap: 12, transition: 'background 0.12s', cursor: 'default' }}
+                style={{ display: 'grid', gridTemplateColumns: '48px 1fr 130px 220px', alignItems: 'center', padding: '0 20px', height: 54, borderBottom: idx < paginated.length - 1 ? '1px solid #20202c' : 'none', gap: 12, transition: 'background 0.12s', cursor: 'default' }}
                 onMouseEnter={e => e.currentTarget.style.background = '#20202c'}
                 onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
               >
@@ -190,6 +223,7 @@ export default function PlayersView() {
                   {player.name}
                   {player.ascenso && <span title="En zona de ascenso" style={{ color: '#22c55e', fontSize: 13, fontWeight: 700, lineHeight: 1 }}>↑</span>}
                 </div>
+                <div style={{ color: '#9999b0', fontSize: 13 }}>{player.localidad || '—'}</div>
                 <div>
                   <CategoryBadge name={player.categoryName} color={player.categoryColor || '#f97316'} valor={player.categoriaValor} />
                 </div>

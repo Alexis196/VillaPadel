@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 
-const STORAGE_KEY = 'padel_nota_cancha'
-
-const DEFAULT_TEMPLATE = `NOTA DE SOLICITUD DE CANCHA
+const DOCS = [
+  {
+    id: 'nota_cancha',
+    label: 'Nota solicitud de cancha',
+    storageKey: 'padel_nota_cancha',
+    template: `NOTA DE SOLICITUD DE CANCHA
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Fecha: [FECHA]
@@ -36,25 +39,61 @@ Firma del solicitante
 
 _______________________________
 VillaPadel — Organización de Torneos
-`
+`,
+  },
+  {
+    id: 'nota_municipio',
+    label: 'Nota al municipio',
+    storageKey: 'padel_nota_municipio',
+    template: `Mayor Villafañe, [DÍA] de [MES] de [AÑO].
+
+SR. INTENDENTE DE LA MUNICIPALIDAD
+DE MAYOR EDMUNDO VILLAFAÑE
+DON VICTOR OSORIO.
+SU DESPACHO________________________/
+
+          Tengo el agrado de dirigirme a Ud., y por su intermedio a quien corresponda, con el fin de solicitarle tenga el bien de concederme las canchas de [TIPO DE CANCHA], ubicadas en el [UBICACIÓN DE LAS CANCHAS].
+
+          Dicha solicitud es para realizar [DESCRIPCIÓN DEL EVENTO], el día [DÍA DE SEMANA] [DÍA] del corriente mes y año, desde las [HORA INICIO] hs. hasta las [HORA FIN] hs.
+
+          Sin otro particular lo saludo a Ud. muy atentamente.
+
+
+
+                                                        ............................
+
+                                                        [APELLIDO], [NOMBRE].
+
+                                                        DNI N°: [DNI]
+`,
+  },
+]
 
 export default function DocumentosAdmin() {
-  const [nota, setNota] = useState('')
+  const [activeDoc, setActiveDoc] = useState(DOCS[0].id)
+  const [texts, setTexts] = useState({})
   const [saved, setSaved] = useState(false)
   const [printing, setPrinting] = useState(false)
   const saveTimer = useRef(null)
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    setNota(stored !== null ? stored : DEFAULT_TEMPLATE)
+    const loaded = {}
+    for (const doc of DOCS) {
+      const stored = localStorage.getItem(doc.storageKey)
+      loaded[doc.id] = stored !== null ? stored : doc.template
+    }
+    setTexts(loaded)
   }, [])
 
+  const doc = DOCS.find(d => d.id === activeDoc)
+  const nota = texts[activeDoc] ?? ''
+
   function handleChange(val) {
-    setNota(val)
+    setTexts(prev => ({ ...prev, [activeDoc]: val }))
     setSaved(false)
     clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
-      localStorage.setItem(STORAGE_KEY, val)
+      localStorage.setItem(doc.storageKey, val)
       setSaved(true)
       setTimeout(() => setSaved(false), 1800)
     }, 600)
@@ -62,8 +101,9 @@ export default function DocumentosAdmin() {
 
   function handleReset() {
     if (!window.confirm('¿Restaurar la plantilla por defecto? Se perderá el texto actual.')) return
-    setNota(DEFAULT_TEMPLATE)
-    localStorage.setItem(STORAGE_KEY, DEFAULT_TEMPLATE)
+    const tpl = doc.template
+    setTexts(prev => ({ ...prev, [activeDoc]: tpl }))
+    localStorage.setItem(doc.storageKey, tpl)
   }
 
   function handleDownloadTxt() {
@@ -71,7 +111,7 @@ export default function DocumentosAdmin() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'nota-solicitud-cancha.txt'
+    a.download = `${doc.label.toLowerCase().replace(/\s+/g, '-')}.txt`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -84,34 +124,89 @@ export default function DocumentosAdmin() {
     }, 100)
   }
 
-  const charCount = nota.length
-
   return (
     <div>
       <style>{`
         @media print {
           body * { visibility: hidden !important; }
-          #doc-print-area, #doc-print-area * { visibility: visible !important; }
+          #doc-print-area { display: block !important; visibility: visible !important; }
+          #doc-print-area * { visibility: visible !important; }
           #doc-print-area {
             position: fixed !important;
             inset: 0 !important;
             background: #fff !important;
-            color: #000 !important;
-            font-family: 'Courier New', monospace !important;
-            font-size: 13px !important;
-            white-space: pre-wrap !important;
-            padding: 32px 40px !important;
-            line-height: 1.6 !important;
           }
         }
       `}</style>
 
-      {/* Print-only area */}
-      <div id="doc-print-area" style={{ display: 'none' }}>{nota}</div>
+      <div id="doc-print-area" style={{ display: 'none' }} aria-hidden="true">
+        <div style={{
+          width: '90%',
+          margin: '0 auto',
+          paddingTop: '5%',
+          fontFamily: 'Times New Roman, serif',
+          fontSize: '13px',
+          lineHeight: '1.8',
+          color: '#000',
+          boxSizing: 'border-box',
+        }}>
+          {activeDoc === 'nota_municipio' ? (
+            <>
+              <div style={{ textAlign: 'right', marginBottom: '1em' }}>
+                {nota.split('\n')[0]}
+              </div>
+              <div>
+                {nota.split('\n').slice(1).map((line, i) => {
+                  const isRight = /^\s{30,}\S/.test(line)
+                  return (
+                    <div key={i} style={{
+                      textAlign: isRight ? 'right' : 'justify',
+                      textAlignLast: isRight ? 'right' : 'left',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}>
+                      {isRight ? line.trim() : (line || ' ')}
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          ) : (
+            <div style={{
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
+              width: '100%',
+            }}>
+              {nota}
+            </div>
+          )}
+        </div>
+      </div>
 
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ color: '#f1f1f5', fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Gestión Documental</h2>
-        <p style={{ color: '#9999b0', fontSize: 13, margin: 0 }}>Editor de nota de solicitud de cancha — guardado automático en el navegador</p>
+        <p style={{ color: '#9999b0', fontSize: 13, margin: 0 }}>Editor de notas — guardado automático por documento</p>
+      </div>
+
+      {/* Document selector */}
+      <div style={{ display: 'flex', gap: 4, marginBottom: 20, background: '#13131a', borderRadius: 10, padding: 4, width: 'fit-content', border: '1px solid #2a2a38' }}>
+        {DOCS.map(d => (
+          <button
+            key={d.id}
+            onClick={() => { setActiveDoc(d.id); setSaved(false) }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '8px 18px', borderRadius: 7, border: 'none', cursor: 'pointer',
+              fontSize: 13, fontWeight: activeDoc === d.id ? 600 : 400,
+              background: activeDoc === d.id ? 'rgba(249,115,22,0.15)' : 'transparent',
+              color: activeDoc === d.id ? '#f97316' : '#9999b0',
+              transition: 'all 0.15s',
+            }}
+          >
+            <span style={{ fontSize: 15 }}>📄</span>
+            {d.label}
+          </button>
+        ))}
       </div>
 
       {/* Toolbar */}
@@ -153,6 +248,7 @@ export default function DocumentosAdmin() {
       {/* Editor */}
       <div style={{ position: 'relative' }}>
         <textarea
+          key={activeDoc}
           value={nota}
           onChange={e => handleChange(e.target.value)}
           spellCheck={false}
@@ -171,31 +267,28 @@ export default function DocumentosAdmin() {
             outline: 'none',
             boxSizing: 'border-box',
             transition: 'border-color 0.15s',
-            whiteSpace: 'pre',
             overflowX: 'auto',
           }}
           onFocus={e => e.target.style.borderColor = '#f97316'}
           onBlur={e => e.target.style.borderColor = '#2a2a38'}
         />
         <div style={{ position: 'absolute', bottom: 10, right: 14, color: '#44445a', fontSize: 11 }}>
-          {charCount} caracteres
+          {nota.length} caracteres
         </div>
       </div>
 
       {/* Tips */}
       <div style={{ marginTop: 14, padding: '12px 16px', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#f97316', flexShrink: 0 }} />
-          <span style={{ color: '#9999b0', fontSize: 12 }}>El texto se guarda automáticamente en el navegador</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
-          <span style={{ color: '#9999b0', fontSize: 12 }}>Descargar .txt genera un archivo de texto plano</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
-          <span style={{ color: '#9999b0', fontSize: 12 }}>Imprimir / PDF abre el diálogo de impresión del navegador</span>
-        </div>
+        {[
+          { col: '#f97316', text: 'Cada nota se guarda por separado en el navegador' },
+          { col: '#3b82f6', text: 'Descargar .txt genera un archivo de texto plano' },
+          { col: '#10b981', text: 'Imprimir / PDF abre el diálogo de impresión del navegador' },
+        ].map(({ col, text }) => (
+          <div key={text} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: col, flexShrink: 0 }} />
+            <span style={{ color: '#9999b0', fontSize: 12 }}>{text}</span>
+          </div>
+        ))}
       </div>
     </div>
   )

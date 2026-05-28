@@ -4,6 +4,14 @@ import {
   writeBatch, serverTimestamp, query, orderBy,
 } from 'firebase/firestore'
 
+// ─── American tournament set winner ──────────────────────────────────────────
+// First to 9 games; if tied at 8-8, win by 2
+export function checkAmericanSetWinner(gA, gB) {
+  if (gA >= 9 && gA - gB >= 2) return 'A'
+  if (gB >= 9 && gB - gA >= 2) return 'B'
+  return null
+}
+
 // ─── Zone generation ──────────────────────────────────────────────────────────
 // tamanoZona: target pairs per zone (3 or 4, default 4)
 // Remainder distributed evenly: some zones get base+1 if n % numGroups > 0
@@ -54,7 +62,7 @@ function roundRobinSchedule(count) {
 }
 
 // ─── Create tournament ────────────────────────────────────────────────────────
-export async function createTorneo({ nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, tipoTorneo, color, sexo, tamanoZona, clasificadosPorZona }) {
+export async function createTorneo({ nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona }) {
   const today = new Date().toISOString().split('T')[0]
   const estado = fechaInicio > today ? 'Inscripción' : 'En curso'
   const ref = await addDoc(collection(db, 'torneos'), {
@@ -66,6 +74,7 @@ export async function createTorneo({ nombre, categoriaId, categoriaName, categor
     fechaInicio,
     estado,
     tipoTorneo: tipoTorneo || 'categoria',
+    modalidadTorneo: modalidadTorneo || 'tradicional',
     sexo: sexo || 'masculino',
     color: color || null,
     tamanoZona: Number(tamanoZona) || 4,
@@ -76,7 +85,7 @@ export async function createTorneo({ nombre, categoriaId, categoriaName, categor
 }
 
 // ─── Update tournament ────────────────────────────────────────────────────────
-export async function updateTorneo(id, { nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, tipoTorneo, color, sexo, tamanoZona, clasificadosPorZona }) {
+export async function updateTorneo(id, { nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona }) {
   const today = new Date().toISOString().split('T')[0]
   const estado = fechaInicio > today ? 'Inscripción' : 'En curso'
   await setDoc(doc(db, 'torneos', id), {
@@ -85,6 +94,7 @@ export async function updateTorneo(id, { nombre, categoriaId, categoriaName, cat
     costoPorJugador: Number(costoPorJugador),
     fechaInicio, estado,
     tipoTorneo: tipoTorneo || 'categoria',
+    modalidadTorneo: modalidadTorneo || 'tradicional',
     sexo: sexo || 'masculino',
     color: color || null,
     tamanoZona: Number(tamanoZona) || 4,
@@ -202,9 +212,17 @@ export async function updateEstado(torneoId, partidoId, estado) {
   await setDoc(doc(db, 'torneos', torneoId, 'partidos', partidoId), { estado }, { merge: true })
 }
 
+export async function updateLlaveEstado(torneoId, llaveId, estado) {
+  await setDoc(doc(db, 'torneos', torneoId, 'llaves', llaveId), { estado }, { merge: true })
+}
+
 // ─── Update live scoreboard ───────────────────────────────────────────────────
 export async function updateMarcador(torneoId, partidoId, marcador) {
   await setDoc(doc(db, 'torneos', torneoId, 'partidos', partidoId), { marcador }, { merge: true })
+}
+
+export async function updateLlaveMarcador(torneoId, llaveId, marcador) {
+  await setDoc(doc(db, 'torneos', torneoId, 'llaves', llaveId), { marcador }, { merge: true })
 }
 
 // ─── Update match schedule (horario) ─────────────────────────────────────────
@@ -223,17 +241,22 @@ export async function updateDuplaPago(torneoId, duplaId, { pago1, pago2 }) {
 }
 
 // ─── Player CRUD (categorization) ────────────────────────────────────────────
-export async function addJugador({ name, categoryName, categoryColor, categoriaValor, sexo }) {
+export async function addJugador({ name, categoryName, categoryColor, categoriaValor, sexo, localidad }) {
   await addDoc(collection(db, 'players'), {
     name, categoryName, categoryColor, categoriaValor: Number(categoriaValor),
     sexo: sexo || 'M', ascenso: false,
+    localidad: localidad?.trim() || '',
     createdAt: serverTimestamp(),
   })
 }
 
 export async function updateJugador(id, fields) {
-  const { name, categoryName, categoryColor, categoriaValor, sexo, ascenso } = fields
-  const data = { name, categoryName, categoryColor, categoriaValor: Number(categoriaValor), sexo: sexo || 'M' }
+  const { name, categoryName, categoryColor, categoriaValor, sexo, ascenso, localidad } = fields
+  const data = {
+    name, categoryName, categoryColor, categoriaValor: Number(categoriaValor),
+    sexo: sexo || 'M',
+    localidad: localidad?.trim() || '',
+  }
   if (ascenso !== undefined) data.ascenso = ascenso
   await setDoc(doc(db, 'players', id), data, { merge: true })
 }
@@ -366,7 +389,8 @@ export async function generateBracket(torneoId) {
 }
 
 // ─── Save bracket match result ────────────────────────────────────────────────
-// Saves result and propagates winner to the next bracket match
+// Saves result and propagates winner to the next bracket match.
+// When both teams are now set in the next match, changes its estado to 'Programado'.
 export async function saveLlaveResultado(torneoId, llaveId, { setsA, setsB, gamesA, gamesB, wo }) {
   const llaveRef = doc(db, 'torneos', torneoId, 'llaves', llaveId)
   const snap = await getDoc(llaveRef)
@@ -391,16 +415,23 @@ export async function saveLlaveResultado(torneoId, llaveId, { setsA, setsB, game
   })
 
   if (data.nextLlaveId && winner) {
-    batch.update(
-      doc(db, 'torneos', torneoId, 'llaves', data.nextLlaveId),
-      { [data.nextSlot === 'A' ? 'duplaA' : 'duplaB']: winner }
-    )
+    const nextRef = doc(db, 'torneos', torneoId, 'llaves', data.nextLlaveId)
+    const nextSnap = await getDoc(nextRef)
+    const nextData = nextSnap.data() || {}
+    const slotKey = data.nextSlot === 'A' ? 'duplaA' : 'duplaB'
+    const otherSlotKey = data.nextSlot === 'A' ? 'duplaB' : 'duplaA'
+    const nextUpdate = { [slotKey]: winner }
+    if (nextData[otherSlotKey]) nextUpdate.estado = 'Programado'
+    batch.update(nextRef, nextUpdate)
   }
 
   await batch.commit()
 }
 
 // ─── Compute standings from matches ──────────────────────────────────────────
+// Rules:
+//   - If a dupla lost ALL their group matches (PG === 0), they get 0 points total.
+//   - Tiebreaker cascade: pts DESC → setsF DESC (sets won) → (gamesF - gamesC) DESC
 export function computeStandings(partidos, duplas) {
   const stats = {}
   for (const d of duplas) {
@@ -433,7 +464,12 @@ export function computeStandings(partidos, duplas) {
     else { b.PG++; a.PP++ }
   }
 
+  // Duplas that lost all their matches get 0 points
+  for (const stat of Object.values(stats)) {
+    if (stat.PJ > 0 && stat.PG === 0) stat.pts = 0
+  }
+
   return Object.values(stats).sort(
-    (a, b) => b.pts - a.pts || (b.setsF - b.setsC) - (a.setsF - a.setsC) || (b.gamesF - b.gamesC) - (a.gamesF - a.gamesC)
+    (a, b) => b.pts - a.pts || b.setsF - a.setsF || (b.gamesF - b.gamesC) - (a.gamesF - a.gamesC)
   )
 }

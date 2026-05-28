@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { collection, getDocs, query, orderBy } from 'firebase/firestore'
 import { db } from '../../firebase/config'
-import { updateHorario, saveResultado, updateEstado, updateMarcador, generateBracket, saveLlaveResultado } from '../../firebase/torneoService'
+import { updateHorario, saveResultado, updateEstado, updateLlaveEstado, updateMarcador, updateLlaveMarcador, generateBracket, saveLlaveResultado } from '../../firebase/torneoService'
+import { useIsMobile } from '../../hooks/useIsMobile'
 import Spinner from '../ui/Spinner'
 
 const STATUS_CFG = {
@@ -48,7 +49,7 @@ const defaultMarcador = () => ({
 // ─── Live score panel ─────────────────────────────────────────────────────────
 // allowThirdSet=false → zone matches: 1-1 sets triggers super tiebreak instead of 3rd set
 // allowThirdSet=true  → bracket SF/Final: full 3 sets
-function LiveScorePanel({ match, torneoId, onUpdated, allowThirdSet = false }) {
+function LiveScorePanel({ match, torneoId, onUpdated, allowThirdSet = false, saveFn, persistFn }) {
   const [m, setM] = useState(() => match.marcador ? { ...defaultMarcador(), ...match.marcador } : defaultMarcador())
   const [finishing, setFinishing] = useState(false)
 
@@ -56,8 +57,12 @@ function LiveScorePanel({ match, torneoId, onUpdated, allowThirdSet = false }) {
 
   async function persist(newM) {
     setM(newM)
-    await updateMarcador(torneoId, match.id, newM)
-    onUpdated({ ...match, marcador: newM })
+    try {
+      await (persistFn ? persistFn(newM) : updateMarcador(torneoId, match.id, newM))
+      onUpdated({ ...match, marcador: newM })
+    } catch (err) {
+      console.error('Error guardando marcador:', err)
+    }
   }
 
   // ── Game resolution: auto-called when a game is won via points ──────────────
@@ -193,10 +198,15 @@ function LiveScorePanel({ match, torneoId, onUpdated, allowThirdSet = false }) {
     setFinishing(true)
     const totalGamesA = m.historialSets.reduce((s, set) => s + set.gA, 0)
     const totalGamesB = m.historialSets.reduce((s, set) => s + set.gB, 0)
-    await saveResultado(torneoId, match.id, { setsA: m.setsA, setsB: m.setsB, gamesA: totalGamesA, gamesB: totalGamesB, wo: false })
-    const ptsA = m.setsA > m.setsB ? 2 : 1
-    const ptsB = m.setsA > m.setsB ? 1 : 2
-    onUpdated({ ...match, estado: 'Finalizado', resultado: { setsA: m.setsA, setsB: m.setsB, gamesA: totalGamesA, gamesB: totalGamesB }, ptsA, ptsB, marcador: m })
+    try {
+      const resultData = { setsA: m.setsA, setsB: m.setsB, gamesA: totalGamesA, gamesB: totalGamesB, wo: false }
+      await (saveFn ? saveFn(resultData) : saveResultado(torneoId, match.id, resultData))
+      const ptsA = m.setsA > m.setsB ? 2 : 1
+      const ptsB = m.setsA > m.setsB ? 1 : 2
+      onUpdated({ ...match, estado: 'Finalizado', resultado: { setsA: m.setsA, setsB: m.setsB, gamesA: totalGamesA, gamesB: totalGamesB }, ptsA, ptsB, marcador: m })
+    } catch (err) {
+      alert('Error al finalizar partido: ' + (err.message || 'Error. Revisá la conexión.'))
+    }
     setFinishing(false)
   }
 
@@ -373,18 +383,25 @@ function MatchRow({ match, torneoId, onUpdated, open, onToggle }) {
   const [saving, setSaving] = useState(false)
   const [savingEstado, setSavingEstado] = useState(false)
   const [msg, setMsg] = useState('')
+  const isCardView = useIsMobile(720)
 
   const cfg = STATUS_CFG[match.estado] || STATUS_CFG.Programado
 
   async function handleEstado(newEstado) {
     if (newEstado === match.estado) return
-    setSavingEstado(true)
-    await updateEstado(torneoId, match.id, newEstado)
-    setSavingEstado(false)
-    onUpdated({ ...match, estado: newEstado })
     if (newEstado === 'Finalizado' && !match.resultado) {
+      setMsg('⚠️ Ingresá el resultado antes de marcar como Finalizado.')
       setTab('resultado')
+      return
     }
+    setSavingEstado(true)
+    try {
+      await updateEstado(torneoId, match.id, newEstado)
+      onUpdated({ ...match, estado: newEstado })
+    } catch (err) {
+      setMsg('Error al cambiar estado: ' + (err.message || 'Error'))
+    }
+    setSavingEstado(false)
   }
 
   async function saveHorario() {
@@ -400,13 +417,18 @@ function MatchRow({ match, torneoId, onUpdated, open, onToggle }) {
     const { setsA, setsB, gamesA, gamesB, wo } = res
     if (setsA === '' || setsB === '') { setMsg('Ingresá los sets.'); setTimeout(() => setMsg(''), 2000); return }
     setSaving(true)
-    await saveResultado(torneoId, match.id, { setsA: Number(setsA), setsB: Number(setsB), gamesA: Number(gamesA) || 0, gamesB: Number(gamesB) || 0, wo })
+    try {
+      await saveResultado(torneoId, match.id, { setsA: Number(setsA), setsB: Number(setsB), gamesA: Number(gamesA) || 0, gamesB: Number(gamesB) || 0, wo })
+      setMsg('Resultado guardado')
+      setTimeout(() => setMsg(''), 2000)
+      const ptsA = Number(setsA) > Number(setsB) ? 2 : (wo ? 0 : 1)
+      const ptsB = Number(setsA) > Number(setsB) ? (wo ? 0 : 1) : 2
+      onUpdated({ ...match, resultado: { setsA: Number(setsA), setsB: Number(setsB), gamesA: Number(gamesA) || 0, gamesB: Number(gamesB) || 0 }, ptsA, ptsB, estado: wo ? 'W.O.' : 'Finalizado' })
+    } catch (err) {
+      setMsg('Error al guardar: ' + (err.message || 'Error'))
+      setTimeout(() => setMsg(''), 4000)
+    }
     setSaving(false)
-    setMsg('Resultado guardado')
-    setTimeout(() => setMsg(''), 2000)
-    const ptsA = Number(setsA) > Number(setsB) ? 2 : (wo ? 0 : 1)
-    const ptsB = Number(setsA) > Number(setsB) ? (wo ? 0 : 1) : 2
-    onUpdated({ ...match, resultado: { setsA: Number(setsA), setsB: Number(setsB), gamesA: Number(gamesA) || 0, gamesB: Number(gamesB) || 0 }, ptsA, ptsB, estado: wo ? 'W.O.' : 'Finalizado' })
   }
 
   const inp = { background: '#13131a', border: '1px solid #2a2a38', borderRadius: 6, padding: '6px 10px', color: '#f1f1f5', fontSize: 13, outline: 'none', width: '100%', boxSizing: 'border-box' }
@@ -419,28 +441,63 @@ function MatchRow({ match, torneoId, onUpdated, open, onToggle }) {
 
   return (
     <div style={{ borderBottom: '1px solid #20202c' }}>
-      <div
-        style={{ display: 'grid', gridTemplateColumns: '80px 80px 1fr 1fr 100px 80px', alignItems: 'center', padding: '0 16px', height: 54, gap: 12, cursor: 'pointer', transition: 'background 0.12s' }}
-        onClick={onToggle}
-        onMouseEnter={e => e.currentTarget.style.background = '#1a1a22'}
-        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-      >
-        <div style={{ color: '#9999b0', fontSize: 12 }}>Zona {match.zonaNombre?.replace('Zona ', '')}</div>
-        <div style={{ color: '#9999b0', fontSize: 12 }}>J{match.jornada}</div>
-        <div>
-          <div style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 600 }}>{match.duplaA?.jugador1}</div>
-          <div style={{ color: '#9999b0', fontSize: 11 }}>{match.duplaA?.jugador2}</div>
+      {isCardView ? (
+        /* Mobile card header */
+        <div
+          style={{ padding: '10px 14px', cursor: 'pointer', transition: 'background 0.12s' }}
+          onClick={onToggle}
+          onMouseEnter={e => e.currentTarget.style.background = '#1a1a22'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <span style={{ color: '#6666a0', fontSize: 11 }}>{match.zonaNombre}</span>
+              <span style={{ color: '#6666a0', fontSize: 11 }}>J{match.jornada}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ padding: '2px 8px', borderRadius: 20, background: cfg.bg, color: cfg.color, fontSize: 11, fontWeight: 600 }}>{match.estado}</span>
+              <span style={{ color: '#44445a', fontSize: 14 }}>{open ? '▲' : '▼'}</span>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{match.duplaA?.jugador1}</div>
+              <div style={{ color: '#9999b0', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{match.duplaA?.jugador2}</div>
+            </div>
+            <span style={{ color: match.resultado ? '#f97316' : '#44445a', fontWeight: 700, fontSize: match.resultado ? 15 : 13, flexShrink: 0 }}>
+              {match.resultado ? `${match.resultado.setsA}–${match.resultado.setsB}` : 'vs'}
+            </span>
+            <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
+              <div style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{match.duplaB?.jugador1}</div>
+              <div style={{ color: '#9999b0', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{match.duplaB?.jugador2}</div>
+            </div>
+          </div>
         </div>
-        <div>
-          <div style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 600 }}>{match.duplaB?.jugador1}</div>
-          <div style={{ color: '#9999b0', fontSize: 11 }}>{match.duplaB?.jugador2}</div>
+      ) : (
+        /* Desktop row */
+        <div
+          style={{ display: 'grid', gridTemplateColumns: '80px 80px 1fr 1fr 100px 80px', alignItems: 'center', padding: '0 16px', height: 54, gap: 12, cursor: 'pointer', transition: 'background 0.12s' }}
+          onClick={onToggle}
+          onMouseEnter={e => e.currentTarget.style.background = '#1a1a22'}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          <div style={{ color: '#9999b0', fontSize: 12 }}>Zona {match.zonaNombre?.replace('Zona ', '')}</div>
+          <div style={{ color: '#9999b0', fontSize: 12 }}>J{match.jornada}</div>
+          <div>
+            <div style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 600 }}>{match.duplaA?.jugador1}</div>
+            <div style={{ color: '#9999b0', fontSize: 11 }}>{match.duplaA?.jugador2}</div>
+          </div>
+          <div>
+            <div style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 600 }}>{match.duplaB?.jugador1}</div>
+            <div style={{ color: '#9999b0', fontSize: 11 }}>{match.duplaB?.jugador2}</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ padding: '2px 8px', borderRadius: 20, background: cfg.bg, color: cfg.color, fontSize: 11, fontWeight: 600 }}>{match.estado}</span>
+            {match.resultado && <span style={{ color: '#f97316', fontSize: 13, fontWeight: 700 }}>{match.resultado.setsA}–{match.resultado.setsB}</span>}
+          </div>
+          <div style={{ textAlign: 'right', color: '#44445a', fontSize: 18 }}>{open ? '▲' : '▼'}</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: cfg.bg, color: cfg.color, fontSize: 11, fontWeight: 600 }}>{match.estado}</span>
-          {match.resultado && <span style={{ color: '#f97316', fontSize: 13, fontWeight: 700 }}>{match.resultado.setsA}–{match.resultado.setsB}</span>}
-        </div>
-        <div style={{ textAlign: 'right', color: '#44445a', fontSize: 18 }}>{open ? '▲' : '▼'}</div>
-      </div>
+      )}
 
       {open && (
         <div style={{ background: '#13131a', borderTop: '1px solid #2a2a38', padding: '14px 16px' }}>
@@ -481,81 +538,82 @@ function MatchRow({ match, torneoId, onUpdated, open, onToggle }) {
             </div>
           )}
 
-          {/* Live score panel */}
-          {match.estado === 'En juego' && (
+          {match.estado === 'En juego' ? (
             <LiveScorePanel match={match} torneoId={torneoId} onUpdated={onUpdated} />
-          )}
-
-          {/* Tabs */}
-          <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
-            <button style={tabStyle(tab === 'horario')} onClick={() => setTab('horario')}>📅 Horario</button>
-            <button style={tabStyle(tab === 'resultado')} onClick={() => setTab('resultado')}>⚽ Resultado manual</button>
-          </div>
-
-          {tab === 'horario' && (
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-              <div>
-                <div style={{ color: '#9999b0', fontSize: 11, marginBottom: 5, fontWeight: 600 }}>FECHA</div>
-                <input type="date" value={horario.fecha} onChange={e => setHorario(p => ({ ...p, fecha: e.target.value }))} style={{ ...inp, width: 160 }} />
+          ) : (
+            <>
+              {/* Tabs */}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
+                <button style={tabStyle(tab === 'horario')} onClick={() => setTab('horario')}>📅 Horario</button>
+                <button style={tabStyle(tab === 'resultado')} onClick={() => setTab('resultado')}>⚽ Resultado manual</button>
               </div>
-              <div>
-                <div style={{ color: '#9999b0', fontSize: 11, marginBottom: 5, fontWeight: 600 }}>HORA</div>
-                <input type="time" value={horario.hora} onChange={e => setHorario(p => ({ ...p, hora: e.target.value }))} style={{ ...inp, width: 130 }} />
-              </div>
-              <div>
-                <div style={{ color: '#9999b0', fontSize: 11, marginBottom: 5, fontWeight: 600 }}>CANCHA</div>
-                <input placeholder="ej. Cancha 1" value={horario.cancha} onChange={e => setHorario(p => ({ ...p, cancha: e.target.value }))} style={{ ...inp, width: 150 }} />
-              </div>
-              <button onClick={saveHorario} disabled={saving} style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
-                {saving ? '...' : 'Guardar horario'}
-              </button>
-            </div>
-          )}
 
-          {tab === 'resultado' && (
-            <div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16, marginBottom: 14 }}>
+              {tab === 'horario' && (
+                <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ color: '#9999b0', fontSize: 11, marginBottom: 5, fontWeight: 600 }}>FECHA</div>
+                    <input type="date" value={horario.fecha} onChange={e => setHorario(p => ({ ...p, fecha: e.target.value }))} style={{ ...inp, width: 160 }} />
+                  </div>
+                  <div>
+                    <div style={{ color: '#9999b0', fontSize: 11, marginBottom: 5, fontWeight: 600 }}>HORA</div>
+                    <input type="time" value={horario.hora} onChange={e => setHorario(p => ({ ...p, hora: e.target.value }))} style={{ ...inp, width: 130 }} />
+                  </div>
+                  <div>
+                    <div style={{ color: '#9999b0', fontSize: 11, marginBottom: 5, fontWeight: 600 }}>CANCHA</div>
+                    <input placeholder="ej. Cancha 1" value={horario.cancha} onChange={e => setHorario(p => ({ ...p, cancha: e.target.value }))} style={{ ...inp, width: 150 }} />
+                  </div>
+                  <button onClick={saveHorario} disabled={saving} style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                    {saving ? '...' : 'Guardar horario'}
+                  </button>
+                </div>
+              )}
+
+              {tab === 'resultado' && (
                 <div>
-                  <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{match.duplaA?.jugador1} / {match.duplaA?.jugador2}</div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16, marginBottom: 14 }}>
                     <div>
-                      <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>SETS</div>
-                      <input type="number" min="0" max="3" value={res.setsA} onChange={e => setRes(p => ({ ...p, setsA: e.target.value }))} style={numInp} />
+                      <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{match.duplaA?.jugador1} / {match.duplaA?.jugador2}</div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <div>
+                          <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>SETS</div>
+                          <input type="number" min="0" max="3" value={res.setsA} onChange={e => setRes(p => ({ ...p, setsA: e.target.value }))} style={numInp} />
+                        </div>
+                        <div>
+                          <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>GAMES</div>
+                          <input type="number" min="0" value={res.gamesA} onChange={e => setRes(p => ({ ...p, gamesA: e.target.value }))} style={numInp} />
+                        </div>
+                      </div>
                     </div>
+                    <div style={{ color: '#44445a', fontWeight: 700, fontSize: 18 }}>VS</div>
                     <div>
-                      <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>GAMES</div>
-                      <input type="number" min="0" value={res.gamesA} onChange={e => setRes(p => ({ ...p, gamesA: e.target.value }))} style={numInp} />
+                      <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{match.duplaB?.jugador1} / {match.duplaB?.jugador2}</div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <div>
+                          <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>SETS</div>
+                          <input type="number" min="0" max="3" value={res.setsB} onChange={e => setRes(p => ({ ...p, setsB: e.target.value }))} style={numInp} />
+                        </div>
+                        <div>
+                          <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>GAMES</div>
+                          <input type="number" min="0" value={res.gamesB} onChange={e => setRes(p => ({ ...p, gamesB: e.target.value }))} style={numInp} />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div style={{ color: '#44445a', fontWeight: 700, fontSize: 18 }}>VS</div>
-                <div>
-                  <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{match.duplaB?.jugador1} / {match.duplaB?.jugador2}</div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <div>
-                      <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>SETS</div>
-                      <input type="number" min="0" max="3" value={res.setsB} onChange={e => setRes(p => ({ ...p, setsB: e.target.value }))} style={numInp} />
-                    </div>
-                    <div>
-                      <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>GAMES</div>
-                      <input type="number" min="0" value={res.gamesB} onChange={e => setRes(p => ({ ...p, gamesB: e.target.value }))} style={numInp} />
-                    </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ef4444', fontSize: 13, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={res.wo} onChange={e => setRes(p => ({ ...p, wo: e.target.checked }))} />
+                      W.O.
+                    </label>
+                    <button onClick={saveRes} disabled={saving} style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                      {saving ? '...' : 'Guardar resultado'}
+                    </button>
                   </div>
                 </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ef4444', fontSize: 13, cursor: 'pointer' }}>
-                  <input type="checkbox" checked={res.wo} onChange={e => setRes(p => ({ ...p, wo: e.target.checked }))} />
-                  W.O.
-                </label>
-                <button onClick={saveRes} disabled={saving} style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
-                  {saving ? '...' : 'Guardar resultado'}
-                </button>
-              </div>
-            </div>
+              )}
+            </>
           )}
 
-          {msg && <p style={{ color: '#22c55e', fontSize: 12, margin: '10px 0 0' }}>{msg}</p>}
+          {msg && <p style={{ color: msg.startsWith('⚠') || msg.startsWith('Error') ? '#ef4444' : '#22c55e', fontSize: 12, margin: '10px 0 0' }}>{msg}</p>}
         </div>
       )}
     </div>
@@ -573,7 +631,37 @@ function LlaveRow({ llave, torneoId, onUpdated }) {
     wo: false,
   })
   const [saving, setSaving] = useState(false)
+  const [savingEstado, setSavingEstado] = useState(false)
   const [msg, setMsg] = useState('')
+
+  // Sync form inputs when llave prop updates (e.g. after parent reloads from Firestore)
+  useEffect(() => {
+    if (llave.resultado) {
+      setRes(p => ({
+        ...p,
+        setsA: llave.resultado.setsA ?? p.setsA,
+        setsB: llave.resultado.setsB ?? p.setsB,
+        gamesA: llave.resultado.gamesA ?? p.gamesA,
+        gamesB: llave.resultado.gamesB ?? p.gamesB,
+      }))
+    }
+  }, [llave.resultado])
+
+  async function handleEstado(newEstado) {
+    if (newEstado === llave.estado) return
+    if (newEstado === 'Finalizado' && !llave.resultado) {
+      setMsg('⚠️ Ingresá el resultado antes de marcar como Finalizado.')
+      return
+    }
+    setSavingEstado(true)
+    try {
+      await updateLlaveEstado(torneoId, llave.id, newEstado)
+      onUpdated({ ...llave, estado: newEstado })
+    } catch (err) {
+      setMsg('Error al cambiar estado: ' + (err.message || 'Error'))
+    }
+    setSavingEstado(false)
+  }
 
   const cfg = STATUS_CFG[llave.estado] || STATUS_CFG.Programado
   const duplaA = llave.duplaA
@@ -586,16 +674,21 @@ function LlaveRow({ llave, torneoId, onUpdated }) {
     const { setsA, setsB, gamesA, gamesB, wo } = res
     if (setsA === '' || setsB === '') { setMsg('Ingresá los sets.'); setTimeout(() => setMsg(''), 2000); return }
     setSaving(true)
-    await saveLlaveResultado(torneoId, llave.id, {
-      setsA: Number(setsA), setsB: Number(setsB),
-      gamesA: Number(gamesA) || 0, gamesB: Number(gamesB) || 0, wo,
-    })
+    try {
+      await saveLlaveResultado(torneoId, llave.id, {
+        setsA: Number(setsA), setsB: Number(setsB),
+        gamesA: Number(gamesA) || 0, gamesB: Number(gamesB) || 0, wo,
+      })
+      setMsg('Resultado guardado')
+      setTimeout(() => setMsg(''), 2000)
+      const ptsA = Number(setsA) > Number(setsB) ? 2 : (wo ? 0 : 1)
+      const ptsB = Number(setsA) > Number(setsB) ? (wo ? 0 : 1) : 2
+      onUpdated({ ...llave, resultado: { setsA: Number(setsA), setsB: Number(setsB), gamesA: Number(gamesA)||0, gamesB: Number(gamesB)||0 }, ptsA, ptsB, estado: wo ? 'W.O.' : 'Finalizado' })
+    } catch (err) {
+      setMsg('Error al guardar: ' + (err.message || 'Error'))
+      setTimeout(() => setMsg(''), 4000)
+    }
     setSaving(false)
-    setMsg('Resultado guardado')
-    setTimeout(() => setMsg(''), 2000)
-    const ptsA = Number(setsA) > Number(setsB) ? 2 : (wo ? 0 : 1)
-    const ptsB = Number(setsA) > Number(setsB) ? (wo ? 0 : 1) : 2
-    onUpdated({ ...llave, resultado: { setsA: Number(setsA), setsB: Number(setsB), gamesA: Number(gamesA)||0, gamesB: Number(gamesB)||0 }, ptsA, ptsB, estado: wo ? 'W.O.' : 'Finalizado' })
   }
 
   const numInp = {
@@ -656,49 +749,90 @@ function LlaveRow({ llave, torneoId, onUpdated }) {
 
       {open && canEdit && (
         <div style={{ background: '#13131a', borderTop: '1px solid #2a2a38', padding: '14px 16px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16, marginBottom: 14 }}>
-            <div>
-              <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
-                {duplaA.jugador1}{duplaA.jugador2 ? ` / ${duplaA.jugador2}` : ''}
+          {llave.estado !== 'W.O.' && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }}>
+              <span style={{ color: '#6666a0', fontSize: 11, fontWeight: 600 }}>ESTADO:</span>
+              <div style={{ position: 'relative' }}>
+                <select
+                  value={llave.estado}
+                  onChange={e => handleEstado(e.target.value)}
+                  disabled={savingEstado}
+                  style={{
+                    background: '#13131a', border: `1px solid ${cfg.color}55`,
+                    borderRadius: 8, color: cfg.color, fontSize: 13, fontWeight: 600,
+                    padding: '6px 28px 6px 12px', cursor: 'pointer', outline: 'none',
+                    appearance: 'none', WebkitAppearance: 'none',
+                    opacity: savingEstado ? 0.6 : 1,
+                  }}
+                >
+                  <option value="Programado">Programado</option>
+                  <option value="En juego">En juego</option>
+                  <option value="Demorado">Demorado</option>
+                  <option value="Reprogramado">Reprogramado</option>
+                  <option value="Finalizado">Finalizado</option>
+                </select>
+                <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: cfg.color, fontSize: 10 }}>▾</span>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <div>
-                  <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>SETS</div>
-                  <input type="number" min="0" max="3" value={res.setsA} onChange={e => setRes(p => ({ ...p, setsA: e.target.value }))} style={numInp} />
-                </div>
-                <div>
-                  <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>GAMES</div>
-                  <input type="number" min="0" value={res.gamesA} onChange={e => setRes(p => ({ ...p, gamesA: e.target.value }))} style={numInp} />
-                </div>
-              </div>
+              {savingEstado && <span style={{ color: '#9999b0', fontSize: 11 }}>Guardando...</span>}
             </div>
-            <div style={{ color: '#44445a', fontWeight: 700, fontSize: 18 }}>VS</div>
-            <div>
-              <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
-                {duplaB.jugador1}{duplaB.jugador2 ? ` / ${duplaB.jugador2}` : ''}
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+          )}
+
+          {llave.estado === 'En juego' ? (
+            <LiveScorePanel
+              match={llave}
+              torneoId={torneoId}
+              onUpdated={onUpdated}
+              allowThirdSet={llave.roundName === 'Semifinal' || llave.roundName === 'Final'}
+              saveFn={(result) => saveLlaveResultado(torneoId, llave.id, result)}
+              persistFn={(newM) => updateLlaveMarcador(torneoId, llave.id, newM)}
+            />
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16, marginBottom: 14 }}>
                 <div>
-                  <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>SETS</div>
-                  <input type="number" min="0" max="3" value={res.setsB} onChange={e => setRes(p => ({ ...p, setsB: e.target.value }))} style={numInp} />
+                  <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
+                    {duplaA.jugador1}{duplaA.jugador2 ? ` / ${duplaA.jugador2}` : ''}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div>
+                      <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>SETS</div>
+                      <input type="number" min="0" max="3" value={res.setsA} onChange={e => setRes(p => ({ ...p, setsA: e.target.value }))} style={numInp} />
+                    </div>
+                    <div>
+                      <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>GAMES</div>
+                      <input type="number" min="0" value={res.gamesA} onChange={e => setRes(p => ({ ...p, gamesA: e.target.value }))} style={numInp} />
+                    </div>
+                  </div>
                 </div>
+                <div style={{ color: '#44445a', fontWeight: 700, fontSize: 18 }}>VS</div>
                 <div>
-                  <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>GAMES</div>
-                  <input type="number" min="0" value={res.gamesB} onChange={e => setRes(p => ({ ...p, gamesB: e.target.value }))} style={numInp} />
+                  <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
+                    {duplaB.jugador1}{duplaB.jugador2 ? ` / ${duplaB.jugador2}` : ''}
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <div>
+                      <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>SETS</div>
+                      <input type="number" min="0" max="3" value={res.setsB} onChange={e => setRes(p => ({ ...p, setsB: e.target.value }))} style={numInp} />
+                    </div>
+                    <div>
+                      <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>GAMES</div>
+                      <input type="number" min="0" value={res.gamesB} onChange={e => setRes(p => ({ ...p, gamesB: e.target.value }))} style={numInp} />
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ef4444', fontSize: 13, cursor: 'pointer' }}>
-              <input type="checkbox" checked={res.wo} onChange={e => setRes(p => ({ ...p, wo: e.target.checked }))} />
-              W.O.
-            </label>
-            <button onClick={saveRes} disabled={saving} style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
-              {saving ? '...' : 'Guardar resultado'}
-            </button>
-          </div>
-          {msg && <p style={{ color: '#22c55e', fontSize: 12, margin: '10px 0 0' }}>{msg}</p>}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ef4444', fontSize: 13, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={res.wo} onChange={e => setRes(p => ({ ...p, wo: e.target.checked }))} />
+                  W.O.
+                </label>
+                <button onClick={saveRes} disabled={saving} style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                  {saving ? '...' : 'Guardar resultado'}
+                </button>
+              </div>
+            </>
+          )}
+          {msg && <p style={{ color: msg.startsWith('⚠') || msg.startsWith('Error') ? '#ef4444' : '#22c55e', fontSize: 12, margin: '10px 0 0' }}>{msg}</p>}
         </div>
       )}
     </div>
@@ -707,6 +841,7 @@ function LlaveRow({ llave, torneoId, onUpdated }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function PartidosAdmin() {
+  const isCardView = useIsMobile(720)
   const [torneos, setTorneos] = useState([])
   const [activeTorneo, setActiveTorneo] = useState(null)
   const [activeTorneoId, setActiveTorneoId] = useState(null)
@@ -778,12 +913,14 @@ export default function PartidosAdmin() {
   }
 
   async function handleUpdated(updated) {
-    const newPartidos = partidos.map(p => p.id === updated.id ? updated : p)
-    setPartidos(newPartidos)
+    let allDone = false
+    setPartidos(prev => {
+      const next = prev.map(p => p.id === updated.id ? updated : p)
+      allDone = next.length > 0 && next.every(p => p.estado === 'Finalizado' || p.estado === 'W.O.')
+      return next
+    })
 
     // Auto-generate bracket when all zone matches are done and no bracket exists yet
-    const allDone = newPartidos.length > 0 &&
-      newPartidos.every(p => p.estado === 'Finalizado' || p.estado === 'W.O.')
     if (allDone && llavesRef.current.length === 0) {
       const tid = activeTorneoRef.current?.id
       if (!tid) return
@@ -834,15 +971,6 @@ export default function PartidosAdmin() {
   const paginated = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   function setFilter(setter) { return (val) => { setter(val); setPage(1) } }
-
-  const filterBtn = (active, label, onClick) => (
-    <button onClick={onClick} style={{
-      padding: '5px 12px', borderRadius: 6, border: '1px solid', fontSize: 12, fontWeight: 500, cursor: 'pointer',
-      borderColor: active ? '#f97316' : '#2a2a38',
-      background: active ? 'rgba(249,115,22,0.12)' : 'transparent',
-      color: active ? '#f97316' : '#9999b0',
-    }}>{label}</button>
-  )
 
   const tabBtn = (t) => (
     <button key={t.id} onClick={() => { setActiveTorneo(t); setActiveTorneoId(t.id) }} style={{
@@ -919,25 +1047,26 @@ export default function PartidosAdmin() {
           {/* ── GRUPO VIEW ─────────────────────────────────────────────────── */}
           {viewMode === 'grupos' && (
             <>
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {filterBtn(filterZona === 'all', 'Todas las zonas', setFilter(() => setFilterZona('all')))}
-                  {zonas.map(z => filterBtn(filterZona === z.id, z.nombre, setFilter(() => setFilterZona(z.id))))}
-                </div>
-                <div style={{ width: 1, height: 20, background: '#2a2a38' }} />
-                <div style={{ display: 'flex', gap: 4 }}>
-                  {filterBtn(filterJornada === 'all', 'Todas', setFilter(() => setFilterJornada('all')))}
-                  {jornadas.map(j => filterBtn(filterJornada === String(j), `J${j}`, setFilter(() => setFilterJornada(String(j)))))}
-                </div>
-                <div style={{ width: 1, height: 20, background: '#2a2a38' }} />
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                  {filterBtn(filterEstado === 'all', 'Todos', setFilter(() => setFilterEstado('all')))}
-                  {filterBtn(filterEstado === 'Programado', 'Programado', setFilter(() => setFilterEstado('Programado')))}
-                  {filterBtn(filterEstado === 'En juego', 'En juego', setFilter(() => setFilterEstado('En juego')))}
-                  {filterBtn(filterEstado === 'Demorado', 'Demorado', setFilter(() => setFilterEstado('Demorado')))}
-                  {filterBtn(filterEstado === 'Reprogramado', 'Reprogramado', setFilter(() => setFilterEstado('Reprogramado')))}
-                  {filterBtn(filterEstado === 'Finalizado', 'Finalizado', setFilter(() => setFilterEstado('Finalizado')))}
-                </div>
+              <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ color: '#6666a0', fontSize: 11, fontWeight: 600 }}>ZONA</span>
+                <select value={filterZona} onChange={e => { setFilterZona(e.target.value); setPage(1) }} style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 6, color: '#f1f1f5', fontSize: 12, padding: '5px 10px', cursor: 'pointer', outline: 'none' }}>
+                  <option value="all">Todas las zonas</option>
+                  {zonas.map(z => <option key={z.id} value={z.id}>{z.nombre}</option>)}
+                </select>
+                <span style={{ color: '#6666a0', fontSize: 11, fontWeight: 600 }}>JORNADA</span>
+                <select value={filterJornada} onChange={e => { setFilterJornada(e.target.value); setPage(1) }} style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 6, color: '#f1f1f5', fontSize: 12, padding: '5px 10px', cursor: 'pointer', outline: 'none' }}>
+                  <option value="all">Todas</option>
+                  {jornadas.map(j => <option key={j} value={String(j)}>J{j}</option>)}
+                </select>
+                <span style={{ color: '#6666a0', fontSize: 11, fontWeight: 600 }}>ESTADO</span>
+                <select value={filterEstado} onChange={e => { setFilterEstado(e.target.value); setPage(1) }} style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 6, color: '#f1f1f5', fontSize: 12, padding: '5px 10px', cursor: 'pointer', outline: 'none' }}>
+                  <option value="all">Todos</option>
+                  <option value="Programado">Programado</option>
+                  <option value="En juego">En juego</option>
+                  <option value="Demorado">Demorado</option>
+                  <option value="Reprogramado">Reprogramado</option>
+                  <option value="Finalizado">Finalizado</option>
+                </select>
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, alignItems: 'center' }}>
                   <span style={{ color: '#6666a0', fontSize: 12 }}>Ver</span>
                   {[10, 25, 50].map(n => (
@@ -959,11 +1088,13 @@ export default function PartidosAdmin() {
               ) : (
                 <>
                   <div style={{ background: '#13131a', borderRadius: 12, border: '1px solid #2a2a38', overflow: 'hidden' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '80px 80px 1fr 1fr 100px 80px', padding: '0 16px', height: 40, borderBottom: '1px solid #2a2a38', background: '#0f0f13', alignItems: 'center', gap: 12 }}>
-                      {['Zona', 'Jornada', 'Dupla A', 'Dupla B', 'Estado', ''].map(h => (
-                        <div key={h} style={{ color: '#6666a0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>{h}</div>
-                      ))}
-                    </div>
+                    {!isCardView && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '80px 80px 1fr 1fr 100px 80px', padding: '0 16px', height: 40, borderBottom: '1px solid #2a2a38', background: '#0f0f13', alignItems: 'center', gap: 12 }}>
+                        {['Zona', 'Jornada', 'Dupla A', 'Dupla B', 'Estado', ''].map(h => (
+                          <div key={h} style={{ color: '#6666a0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>{h}</div>
+                        ))}
+                      </div>
+                    )}
                     {paginated.map(m => (
                       <MatchRow
                         key={m.id}

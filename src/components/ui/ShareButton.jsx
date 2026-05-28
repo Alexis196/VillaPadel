@@ -1,94 +1,99 @@
-import { useState, useRef, useEffect } from 'react'
-import html2canvas from 'html2canvas'
+import { useState } from 'react'
+import { toCanvas } from 'html-to-image'
 import jsPDF from 'jspdf'
 
 export default function ShareButton({ targetRef, title = 'VillaPadel', filename = 'villapadel' }) {
-  const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const menuRef = useRef(null)
-
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  const [preview, setPreview] = useState(null) // { dataUrl, canvas }
 
   async function capture() {
     const el = targetRef.current
-    const width = Math.round(el.getBoundingClientRect().width)
-    return html2canvas(el, {
-      backgroundColor: '#1a1a22',
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      width,
-      windowWidth: document.documentElement.clientWidth,
-      onclone: (clonedDoc) => {
-        clonedDoc.querySelectorAll('*').forEach(node => {
-          const s = node.style
-          if (s && s.display === 'flex' && !s.alignItems) {
-            s.alignItems = 'center'
-          }
-        })
-      },
-    })
+
+    const prev = { overflow: el.style.overflow, overflowX: el.style.overflowX, overflowY: el.style.overflowY }
+    el.style.overflow = 'visible'
+    el.style.overflowX = 'visible'
+    el.style.overflowY = 'visible'
+    const fullWidth = el.scrollWidth
+    const fullHeight = el.scrollHeight
+
+    try {
+      return await toCanvas(el, {
+        backgroundColor: '#1a1a22',
+        pixelRatio: 2,
+        width: fullWidth,
+        height: fullHeight,
+        style: {
+          overflow: 'visible',
+          overflowX: 'visible',
+          overflowY: 'visible',
+          width: fullWidth + 'px',
+          height: fullHeight + 'px',
+        },
+        filter: node => {
+          // Exclude elements that shouldn't appear in the capture
+          if (node.tagName === 'SCRIPT' || node.tagName === 'NOSCRIPT') return false
+          return true
+        },
+      })
+    } finally {
+      el.style.overflow = prev.overflow
+      el.style.overflowX = prev.overflowX
+      el.style.overflowY = prev.overflowY
+    }
+  }
+
+  async function openPreview() {
+    setLoading(true)
+    try {
+      const canvas = await capture()
+      setPreview({ dataUrl: canvas.toDataURL('image/png'), canvas })
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function shareImage() {
-    setLoading(true)
-    setOpen(false)
-    try {
-      const canvas = await capture()
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
-      const file = new File([blob], `${filename}.png`, { type: 'image/png' })
-
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title, text: `${title} — VillaPadel` })
-      } else {
-        // Fallback: download
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `${filename}.png`
-        a.click()
-        URL.revokeObjectURL(url)
-      }
-    } finally {
-      setLoading(false)
+    const { canvas } = preview
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'))
+    const file = new File([blob], `${filename}.png`, { type: 'image/png' })
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title, text: `${title} — VillaPadel` })
+    } else {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${filename}.png`
+      a.click()
+      URL.revokeObjectURL(url)
     }
+    setPreview(null)
   }
 
   async function sharePDF() {
-    setLoading(true)
-    setOpen(false)
-    try {
-      const canvas = await capture()
-      const imgData = canvas.toDataURL('image/png')
-      const w = canvas.width / 2
-      const h = canvas.height / 2
-      const pdf = new jsPDF({ orientation: w > h ? 'l' : 'p', unit: 'px', format: [w, h] })
-      pdf.addImage(imgData, 'PNG', 0, 0, w, h)
-      pdf.save(`${filename}.pdf`)
-    } finally {
-      setLoading(false)
-    }
+    const { canvas, dataUrl } = preview
+    const w = canvas.width / 2
+    const h = canvas.height / 2
+    const pdf = new jsPDF({ orientation: w > h ? 'l' : 'p', unit: 'px', format: [w, h] })
+    pdf.addImage(dataUrl, 'PNG', 0, 0, w, h)
+    pdf.save(`${filename}.pdf`)
+    setPreview(null)
+  }
+
+  const btnStyle = {
+    display: 'flex', alignItems: 'center', gap: 6,
+    padding: '7px 14px', borderRadius: 8,
+    background: loading ? 'rgba(37,211,102,0.08)' : 'rgba(37,211,102,0.12)',
+    border: '1px solid rgba(37,211,102,0.3)',
+    color: '#25d366', fontSize: 13, fontWeight: 600,
+    cursor: loading ? 'wait' : 'pointer', transition: 'all 0.15s',
   }
 
   return (
-    <div ref={menuRef} style={{ position: 'relative' }}>
+    <div style={{ position: 'relative' }}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={openPreview}
         disabled={loading}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 6,
-          padding: '7px 14px', borderRadius: 8,
-          background: loading ? 'rgba(37,211,102,0.08)' : 'rgba(37,211,102,0.12)',
-          border: '1px solid rgba(37,211,102,0.3)',
-          color: '#25d366', fontSize: 13, fontWeight: 600,
-          cursor: loading ? 'wait' : 'pointer', transition: 'all 0.15s',
-        }}
+        style={btnStyle}
         onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = '#25d366'; e.currentTarget.style.color = '#fff' } }}
         onMouseLeave={e => { e.currentTarget.style.background = 'rgba(37,211,102,0.12)'; e.currentTarget.style.color = '#25d366' }}
       >
@@ -103,38 +108,42 @@ export default function ShareButton({ targetRef, title = 'VillaPadel', filename 
         {loading ? 'Generando...' : 'Compartir'}
       </button>
 
-      {open && (
-        <div style={{
-          position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 200,
-          background: '#1a1a22', border: '1px solid #2a2a38', borderRadius: 10,
-          overflow: 'hidden', minWidth: 200,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
-        }}>
-          <button
-            onClick={shareImage}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px', background: 'transparent', border: 'none', color: '#f1f1f5', fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#2a2a38'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          >
-            <span style={{ fontSize: 16 }}>📷</span>
-            <div>
-              <div style={{ fontWeight: 600 }}>Compartir como imagen</div>
-              <div style={{ color: '#9999b0', fontSize: 11 }}>WhatsApp / Guardar PNG</div>
-            </div>
-          </button>
-          <div style={{ height: 1, background: '#2a2a38' }} />
-          <button
-            onClick={sharePDF}
-            style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '11px 16px', background: 'transparent', border: 'none', color: '#f1f1f5', fontSize: 13, cursor: 'pointer', textAlign: 'left' }}
-            onMouseEnter={e => e.currentTarget.style.background = '#2a2a38'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-          >
-            <span style={{ fontSize: 16 }}>📄</span>
-            <div>
-              <div style={{ fontWeight: 600 }}>Descargar PDF</div>
-              <div style={{ color: '#9999b0', fontSize: 11 }}>Guardar y compartir por WhatsApp</div>
-            </div>
-          </button>
+      {/* Preview modal */}
+      {preview && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 3000, padding: 20 }}
+          onClick={e => { if (e.target === e.currentTarget) setPreview(null) }}
+        >
+          <p style={{ color: '#9999b0', fontSize: 12, margin: '0 0 12px', letterSpacing: '0.5px', textTransform: 'uppercase', fontWeight: 600 }}>
+            Vista previa
+          </p>
+
+          {/* Image container */}
+          <div style={{ maxWidth: '92vw', maxHeight: '70vh', overflow: 'auto', borderRadius: 10, border: '1px solid #2a2a38', boxShadow: '0 8px 40px rgba(0,0,0,0.6)' }}>
+            <img src={preview.dataUrl} alt="Vista previa" style={{ display: 'block', maxWidth: '100%', height: 'auto' }} />
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <button
+              onClick={() => setPreview(null)}
+              style={{ padding: '9px 20px', borderRadius: 8, background: 'transparent', border: '1px solid #3a3a50', color: '#9999b0', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={sharePDF}
+              style={{ padding: '9px 20px', borderRadius: 8, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.4)', color: '#818cf8', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+            >
+              📄 Descargar PDF
+            </button>
+            <button
+              onClick={shareImage}
+              style={{ padding: '9px 20px', borderRadius: 8, background: '#25d366', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+            >
+              📷 Compartir imagen
+            </button>
+          </div>
         </div>
       )}
 
