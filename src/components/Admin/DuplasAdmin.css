@@ -1,0 +1,190 @@
+/* ─── DuplasAdmin.css ─── */
+
+/* Page header */
+.da-page-title { color: #f1f1f5; font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+.da-page-desc { color: #9999b0; font-size: 13px; margin: 0; }
+
+/* Empty state */
+.da-empty { text-align: center; padding: 48px; background: #13131a; border-radius: 12px; border: 1px dashed #2a2a38; color: #9999b0; }
+
+/* Torneo section header */
+.da-torneo-section { margin-bottom: 32px; }
+.da-torneo-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.da-torneo-name { color: #f1f1f5; font-size: 16px; font-weight: 700; margin: 0; }
+.da-torneo-badge { padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+.da-cat-badge {
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(249,115,22,0.10);
+  color: #f97316;
+}
+
+/* Stats grid */
+.da-stats-grid { display: grid; gap: 10px; margin-bottom: 14px; }
+.da-stat-card { background: #13131a; border: 1px solid #2a2a38; border-radius: 10px; padding: 12px 14px; }
+.da-stat-value { font-size: 18px; font-weight: 800; line-height: 1; margin-bottom: 3px; }
+.da-stat-label { color: #9999b0; font-size: 10px; }
+
+/* Page size group */
+.da-pagesize-group { display: flex; gap: 4px; align-items: center; margin-bottom: 10px; justify-content: flex-end; }
+.da-pagesize-label { color: #6666a0; font-size: 12px; }
+.da-pagesize-btn {
+  padding: 4px 10px; border-radius: 6px; border: 1px solid #2a2a38;
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+  background: transparent; color: #9999b0;
+}
+.da-pagesize-btn.active { background: #f97316; color: #fff; border-color: #f97316; }
+
+/* Mobile cards list */
+.da-card-list { display: flex; flex-direction: column; gap: 10px; }
+.da-card { background: #13131a; border-radius: 10px; overflow: hidden; }
+.da-card-body { padding: 10px 14px; }
+.da-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.da-player-main { color: #f1f1f5; font-size: 13px; font-weight: 600; line-height: 1.3; }
+.da-player-sub  { color: #f1f1f5; font-size: 13px; font-weight: 600; line-height: 1.3; }
+.da-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.da-btn-edit {
+  background: rgba(255,255,255,0.06);
+  border: none; border-radius: 6px;
+  color: #9999b0; font-size: 11px; padding: 5px 10px;
+  cursor: pointer; font-weight: 500;
+}
+.da-btn-edit.active { background: rgba(249,115,22,0.15); color: #f97316; }
+.da-btn-delete {
+  background: rgba(239,68,68,0.08);
+  border: none; border-radius: 6px;
+  color: #ef4444; font-size: 11px; padding: 5px 10px;
+  cursor: pointer; font-weight: 500;
+}
+.da-btn-delete:disabled { opacity: 0.5; cursor: wait; }
+.da-pago-rows { display: flex; flex-direction: column; gap: 4px; }
+.da-pago-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.da-pago-player { color: #6666a0; font-size: 11px; min-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.da-pago-amount { color: #22c55e; font-size: 11px; font-weight: 600; }
+
+/* Pago/metodo badges */
+.da-badge { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.da-badge-muted { color: #44445a; font-size: 12px; }
+
+/* Desktop table */
+.da-table-wrap { background: #13131a; border-radius: 12px; border: 1px solid #2a2a38; overflow: hidden; }
+.da-table-head {
+  display: flex; border-bottom: 1px solid #2a2a38;
+  background: #0f0f13; height: 36px; align-items: center;
+}
+.da-table-head-inner {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 110px 130px 100px;
+  padding: 0 16px; gap: 10px; align-items: center;
+}
+.da-th { color: #6666a0; font-size: 10px; font-weight: 600; text-transform: uppercase; }
+.da-table-head-spacer { width: 90px; padding: 0 16px; }
+
+.da-row-border { border-bottom: 1px solid #262636; }
+.da-row-flex { display: flex; align-items: stretch; }
+.da-row-inner { flex: 1; }
+.da-row-grid {
+  display: grid;
+  grid-template-columns: 1fr 110px 130px 100px;
+  padding: 7px 16px; align-items: center; gap: 10px;
+}
+.da-row-grid-sub { border-bottom: 1px solid #1c1c2c; }
+.da-row-player-1 { color: #f1f1f5; font-size: 13px; }
+.da-row-player-2 { color: #f1f1f5; font-size: 13px; }
+.da-row-actions {
+  width: 100px;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 5px; padding: 6px 12px;
+  border-left: 1px solid #1c1c28;
+}
+.da-row-edit-btn {
+  background: rgba(255,255,255,0.06);
+  border: none; border-radius: 6px;
+  color: #9999b0; font-size: 11px; padding: 4px 8px;
+  cursor: pointer; font-weight: 500; white-space: nowrap; width: 100%;
+}
+.da-row-edit-btn.active { background: rgba(249,115,22,0.15); color: #f97316; }
+.da-row-delete-btn {
+  background: rgba(239,68,68,0.08);
+  border: none; border-radius: 6px;
+  color: #ef4444; font-size: 11px; padding: 4px 8px;
+  cursor: pointer; font-weight: 500; white-space: nowrap; width: 100%;
+}
+.da-row-delete-btn:disabled { opacity: 0.5; cursor: wait; }
+.da-monto-value { font-size: 13px; }
+
+/* Pagination */
+.da-pagination { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; color: #9999b0; font-size: 12px; }
+.da-pagination-btns { display: flex; gap: 4px; }
+.da-page-btn {
+  padding: 4px 8px; border-radius: 6px; border: 1px solid #2a2a38;
+  background: transparent; color: #9999b0; cursor: pointer; font-size: 12px;
+}
+.da-page-btn:disabled { color: #44445a; cursor: default; }
+.da-page-num-btn {
+  padding: 4px 10px; border-radius: 6px; border: 1px solid #2a2a38;
+  background: transparent; color: #9999b0; cursor: pointer; font-size: 12px;
+}
+.da-page-num-btn.active { background: #f97316; color: #fff; border-color: #f97316; }
+
+/* Financial summary */
+.da-financial-bar {
+  margin-top: 10px; padding: 10px 14px;
+  background: #13131a; border: 1px solid #2a2a38; border-radius: 10px;
+  display: flex; gap: 20px; flex-wrap: wrap; align-items: center;
+}
+.da-financial-item { font-size: 12px; }
+.da-financial-label { color: #9999b0; }
+.da-financial-divider { width: 1px; height: 24px; background: #2a2a38; flex-shrink: 0; }
+.da-financial-method { display: flex; align-items: center; gap: 5px; }
+.da-method-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+/* Edit row */
+.da-edit-row { padding: 12px 16px; background: rgba(249,115,22,0.04); border-top: 1px solid #2a2a38; }
+.da-edit-player-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.da-edit-j-label { font-size: 11px; font-weight: 700; width: 20px; flex-shrink: 0; }
+.da-edit-player-name { color: #9999b0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.da-edit-pago-row-mobile { display: flex; gap: 4px; padding-left: 26px; }
+.da-edit-pago-row-desktop { display: flex; align-items: center; gap: 8px; }
+.da-edit-player-name-desktop { color: #9999b0; font-size: 12px; width: 130px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.da-save-btn {
+  background: #22c55e; color: #fff; border: none;
+  border-radius: 6px; padding: 5px 16px;
+  font-size: 12px; font-weight: 600; margin-top: 8px;
+}
+.da-save-btn:disabled { opacity: 0.7; cursor: wait; }
+
+/* Form input */
+.da-inp {
+  background: #0f0f13; border: 1px solid #2a2a38; border-radius: 6px;
+  padding: 5px 8px; color: #f1f1f5; font-size: 12px;
+  outline: none; box-sizing: border-box;
+}
+
+/* Confirm delete modal */
+.da-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+.da-modal {
+  background: #1a1a22; border: 1px solid #2a2a38; border-radius: 12px;
+  padding: 24px 28px; width: 100%; max-width: 360px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+}
+.da-modal-icon { width: 40px; height: 40px; border-radius: 50%; background: rgba(239,68,68,0.12); display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 14px; }
+.da-modal-title { color: #f1f1f5; font-size: 16px; font-weight: 700; margin: 0 0 6px; }
+.da-modal-player { color: #9999b0; font-size: 13px; margin: 0 0 6px; }
+.da-modal-player strong { color: #f1f1f5; font-weight: 600; }
+.da-modal-sep { color: #6666a0; }
+.da-modal-warn { color: #6666a0; font-size: 12px; margin: 0 0 20px; }
+.da-modal-actions { display: flex; gap: 8px; }
+.da-modal-cancel {
+  flex: 1; padding: 9px 0; border-radius: 8px; border: 1px solid #2a2a38;
+  background: transparent; color: #9999b0; font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.da-modal-confirm {
+  flex: 1; padding: 9px 0; border-radius: 8px; border: none;
+  background: #ef4444; color: #fff; font-size: 13px; font-weight: 700;
+}
+.da-modal-confirm:disabled { opacity: 0.7; cursor: wait; }

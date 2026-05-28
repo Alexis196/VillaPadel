@@ -3,6 +3,7 @@ import { useCollection } from '../../hooks/useFirestore'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import Spinner from '../ui/Spinner'
 import ShareButton from '../ui/ShareButton'
+import './PlayersView.css'
 
 const CAT_FILTERS = [
   { id: 'all', label: 'Todas' },
@@ -16,21 +17,13 @@ const CAT_FILTERS = [
   { id: 'cat-8va', label: '8va' },
 ]
 
-function CategoryBadge({ name, color, valor }) {
+function SexoBadge({ sexo }) {
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '4px 12px', borderRadius: 20,
-      background: `${color}18`, border: `1px solid ${color}40`,
-      color, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap',
+    <span className="pv-sexo-badge" style={{
+      background: sexo === 'F' ? 'rgba(236,72,153,0.15)' : 'rgba(59,130,246,0.15)',
+      color: sexo === 'F' ? '#ec4899' : '#3b82f6',
     }}>
-      <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, display: 'inline-block', flexShrink: 0 }} />
-      {name}
-      {valor != null && (
-        <span style={{ background: color, color: '#fff', borderRadius: 10, padding: '0px 6px', fontSize: 10, fontWeight: 800, lineHeight: '16px' }}>
-          {valor}
-        </span>
-      )}
+      {sexo === 'F' ? 'F' : 'M'}
     </span>
   )
 }
@@ -82,84 +75,73 @@ export default function PlayersView() {
   if (loading) return <Spinner />
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: isMobile ? '20px 12px' : '32px 24px' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
+    <div className="pv-page" style={{ padding: isMobile ? '20px 12px' : '32px 24px' }}>
+      <div className="pv-header">
         <div>
           <h1 style={{ color: '#f1f1f5', fontSize: isMobile ? 22 : 28, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.5px' }}>
             Categorización
           </h1>
-          <p style={{ color: '#9999b0', fontSize: 14, margin: 0 }}>
-            {filtered.length} de {players.length} jugadores
-          </p>
+          <p className="pv-subtitle">{filtered.length} de {players.length} jugadores</p>
         </div>
         <ShareButton targetRef={shareRef} title="Categorización" filename="categorizacion" />
       </div>
 
-      {/* Search + filters */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-        {/* Search */}
-        <div style={{ position: 'relative' }}>
-          <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#6666a0', fontSize: 14, pointerEvents: 'none' }}>🔍</span>
+      <div className="pv-filter-section">
+        <div className="pv-search-wrap">
+          <span className="pv-search-icon">🔍</span>
           <input
             type="text"
             placeholder="Buscar por nombre..."
             value={search}
             onChange={e => handleSearch(e.target.value)}
-            style={{ width: '100%', background: '#1a1a22', border: '1px solid #2a2a38', borderRadius: 8, padding: '9px 36px 9px 36px', color: '#f1f1f5', fontSize: 13, outline: 'none', transition: 'border-color 0.15s', boxSizing: 'border-box' }}
-            onFocus={e => e.target.style.borderColor = '#f97316'}
-            onBlur={e => e.target.style.borderColor = '#2a2a38'}
+            className="pv-search-input"
           />
           {search && (
-            <button onClick={() => handleSearch('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: '#9999b0', cursor: 'pointer', fontSize: 16, lineHeight: 1 }}>×</button>
+            <button onClick={() => handleSearch('')} className="pv-search-clear">×</button>
           )}
         </div>
 
-        {/* Cross-filters row */}
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Category filter */}
-          <span style={{ color: '#6666a0', fontSize: 11, fontWeight: 600 }}>CATEGORÍA</span>
-          <select
-            value={filterCat}
-            onChange={e => handleFilterCat(e.target.value)}
-            style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 6, color: '#f1f1f5', fontSize: 12, padding: '5px 10px', cursor: 'pointer', outline: 'none' }}
-          >
+        <div className="pv-filter-row">
+          <span className="pv-filter-label">CATEGORÍA</span>
+          <select value={filterCat} onChange={e => handleFilterCat(e.target.value)} className="pv-filter-select">
             <option value="all">Todas</option>
             {CAT_FILTERS.slice(1).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
           </select>
-          {/* Sexo filter */}
-          <span style={{ color: '#6666a0', fontSize: 11, fontWeight: 600 }}>SEXO</span>
-          <select
-            value={filterSexo}
-            onChange={e => handleFilterSexo(e.target.value)}
-            style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 6, color: '#f1f1f5', fontSize: 12, padding: '5px 10px', cursor: 'pointer', outline: 'none' }}
-          >
+
+          <span className="pv-filter-label">SEXO</span>
+          <select value={filterSexo} onChange={e => handleFilterSexo(e.target.value)} className="pv-filter-select">
             <option value="all">Todos</option>
             <option value="M">Masculino</option>
             <option value="F">Femenino</option>
           </select>
-          {/* Localidad filter */}
+
           {localidades.length > 0 && (
             <>
-              <div style={{ width: 1, height: 20, background: '#2a2a38', flexShrink: 0 }} />
-              <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+              <div className="pv-filter-divider" />
+              <div className="pv-localidad-wrap">
                 <select
                   value={filterLocalidad}
                   onChange={e => { setFilterLocalidad(e.target.value); resetPage() }}
-                  style={{ background: '#13131a', border: `1px solid ${filterLocalidad !== 'all' ? '#f97316' : '#2a2a38'}`, borderRadius: 6, color: filterLocalidad !== 'all' ? '#f97316' : '#9999b0', fontSize: 12, fontWeight: 600, padding: '5px 28px 5px 10px', cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none' }}
+                  className="pv-filter-select"
+                  style={{
+                    border: `1px solid ${filterLocalidad !== 'all' ? '#f97316' : '#2a2a38'}`,
+                    color: filterLocalidad !== 'all' ? '#f97316' : '#9999b0',
+                    fontWeight: 600, paddingRight: 28, appearance: 'none', WebkitAppearance: 'none',
+                  }}
                 >
                   <option value="all">Localidad</option>
                   {localidades.map(l => <option key={l} value={l}>{l}</option>)}
                 </select>
-                <span style={{ position: 'absolute', right: 8, pointerEvents: 'none', color: filterLocalidad !== 'all' ? '#f97316' : '#9999b0', fontSize: 10 }}>▾</span>
+                <span className="pv-localidad-arrow" style={{ color: filterLocalidad !== 'all' ? '#f97316' : '#9999b0' }}>▾</span>
               </div>
             </>
           )}
-          {/* Page size (desktop only) */}
+
           {!isMobile && (
-            <div style={{ marginLeft: 'auto', display: 'flex', gap: 4 }}>
+            <div className="pv-pagesize-group">
               {[10, 25, 50].map(n => (
-                <button key={n} onClick={() => handlePageSize(n)} style={{ padding: '5px 11px', borderRadius: 6, border: '1px solid', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: pageSize === n ? '#f97316' : 'transparent', color: pageSize === n ? '#fff' : '#9999b0', borderColor: pageSize === n ? '#f97316' : '#2a2a38' }}>{n}</button>
+                <button key={n} onClick={() => handlePageSize(n)}
+                  className={`pv-pagesize-btn${pageSize === n ? ' active' : ''}`}>{n}</button>
               ))}
             </div>
           )}
@@ -167,67 +149,62 @@ export default function PlayersView() {
       </div>
 
       {filtered.length === 0 ? (
-        <div style={{ padding: 48, textAlign: 'center', color: '#9999b0', background: '#1a1a22', borderRadius: 12, border: '1px solid #2a2a38' }}>
+        <div className="pv-empty">
           {players.length === 0 ? 'No hay jugadores registrados aún.' : 'No se encontraron jugadores con esos filtros.'}
         </div>
       ) : isMobile ? (
-        /* Mobile: card grid */
-        <div ref={shareRef} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          {paginated.map((player, idx) => (
-            <div key={player.id} style={{ background: '#1a1a22', borderRadius: 10, border: '1px solid #2a2a38', padding: '12px 14px' }}>
-              <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 13, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
-                {player.name}
-                {player.ascenso && <span style={{ color: '#22c55e', fontSize: 12, fontWeight: 700 }}>↑</span>}
+        <div ref={shareRef} className="pv-cards-grid">
+          {paginated.map(player => {
+            const col = player.categoryColor || '#f97316'
+            return (
+              <div key={player.id} className="pv-card">
+                <div className="pv-card-name">
+                  {player.name}
+                  {player.ascenso && <span className="pv-card-ascenso">↑</span>}
+                </div>
+                {player.localidad && <div className="pv-card-location">{player.localidad}</div>}
+                <div className="pv-card-meta">
+                  <span className="pv-cat-badge" style={{ background: `${col}18`, border: `1px solid ${col}40`, color: col }}>
+                    <span className="pv-cat-dot" style={{ background: col }} />
+                    {player.categoryName}
+                  </span>
+                  <SexoBadge sexo={player.sexo} />
+                </div>
               </div>
-              {player.localidad && (
-                <div style={{ color: '#6666a0', fontSize: 11, marginBottom: 5 }}>{player.localidad}</div>
-              )}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                <span style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 20,
-                  background: `${player.categoryColor || '#f97316'}18`, border: `1px solid ${player.categoryColor || '#f97316'}40`,
-                  color: player.categoryColor || '#f97316', fontSize: 10, fontWeight: 700,
-                }}>
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: player.categoryColor || '#f97316' }} />
-                  {player.categoryName}
-                </span>
-                <span style={{
-                  fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
-                  background: player.sexo === 'F' ? 'rgba(236,72,153,0.15)' : 'rgba(59,130,246,0.15)',
-                  color: player.sexo === 'F' ? '#ec4899' : '#3b82f6',
-                }}>
-                  {player.sexo === 'F' ? 'F' : 'M'}
-                </span>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
-        /* Desktop: table */
-        <div ref={shareRef} style={{ background: '#1a1a22', borderRadius: 12, border: '1px solid #2a2a38', overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr 130px 220px', alignItems: 'center', padding: '0 20px', height: 42, borderBottom: '1px solid #2a2a38', background: '#16161e', gap: 12 }}>
-            <div style={{ color: '#6666a0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>#</div>
-            <div style={{ color: '#6666a0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Jugador</div>
-            <div style={{ color: '#6666a0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Localidad</div>
-            <div style={{ color: '#6666a0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Categoría</div>
+        <div ref={shareRef} className="pv-table-wrap">
+          <div className="pv-table-head">
+            <div className="pv-th">#</div>
+            <div className="pv-th">Jugador</div>
+            <div className="pv-th">Localidad</div>
+            <div className="pv-th">Categoría</div>
           </div>
           {paginated.map((player, idx) => {
             const globalIdx = (safePage - 1) * pageSize + idx
+            const col = player.categoryColor || '#f97316'
             return (
               <div
                 key={player.id}
-                style={{ display: 'grid', gridTemplateColumns: '48px 1fr 130px 220px', alignItems: 'center', padding: '0 20px', height: 54, borderBottom: idx < paginated.length - 1 ? '1px solid #20202c' : 'none', gap: 12, transition: 'background 0.12s', cursor: 'default' }}
-                onMouseEnter={e => e.currentTarget.style.background = '#20202c'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                className="pv-table-row"
+                style={{ borderBottom: idx < paginated.length - 1 ? '1px solid #20202c' : 'none' }}
               >
-                <div style={{ color: '#44445a', fontSize: 13, fontWeight: 600 }}>{globalIdx + 1}</div>
-                <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div className="pv-row-num">{globalIdx + 1}</div>
+                <div className="pv-row-name">
                   {player.name}
-                  {player.ascenso && <span title="En zona de ascenso" style={{ color: '#22c55e', fontSize: 13, fontWeight: 700, lineHeight: 1 }}>↑</span>}
+                  {player.ascenso && <span title="En zona de ascenso" className="pv-row-ascenso">↑</span>}
                 </div>
-                <div style={{ color: '#9999b0', fontSize: 13 }}>{player.localidad || '—'}</div>
+                <div className="pv-row-location">{player.localidad || '—'}</div>
                 <div>
-                  <CategoryBadge name={player.categoryName} color={player.categoryColor || '#f97316'} valor={player.categoriaValor} />
+                  <span className="pv-cat-badge-full" style={{ background: `${col}18`, border: `1px solid ${col}40`, color: col }}>
+                    <span className="pv-cat-dot-full" style={{ background: col }} />
+                    {player.categoryName}
+                    {player.categoriaValor != null && (
+                      <span className="pv-cat-valor" style={{ background: col }}>{player.categoriaValor}</span>
+                    )}
+                  </span>
                 </div>
               </div>
             )
@@ -235,22 +212,22 @@ export default function PlayersView() {
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, color: '#9999b0', fontSize: 12, flexWrap: 'wrap', gap: 8 }}>
+        <div className="pv-pagination">
           <span>{filtered.length} jugadores · pág. {safePage}/{totalPages}</span>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button onClick={() => setPage(1)} disabled={safePage === 1} style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #2a2a38', background: 'transparent', color: safePage === 1 ? '#44445a' : '#9999b0', cursor: safePage === 1 ? 'default' : 'pointer', fontSize: 12 }}>«</button>
-            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #2a2a38', background: 'transparent', color: safePage === 1 ? '#44445a' : '#9999b0', cursor: safePage === 1 ? 'default' : 'pointer', fontSize: 12 }}>‹</button>
+          <div className="pv-pagination-btns">
+            <button onClick={() => setPage(1)} disabled={safePage === 1} className="pv-page-btn">«</button>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="pv-page-btn">‹</button>
             {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
               const start = Math.max(1, Math.min(safePage - 2, totalPages - 4))
               const pg = start + i
               return pg <= totalPages ? (
-                <button key={pg} onClick={() => setPage(pg)} style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: pg === safePage ? '#f97316' : 'transparent', color: pg === safePage ? '#fff' : '#9999b0', borderColor: pg === safePage ? '#f97316' : '#2a2a38' }}>{pg}</button>
+                <button key={pg} onClick={() => setPage(pg)}
+                  className={`pv-page-num-btn${pg === safePage ? ' active' : ''}`}>{pg}</button>
               ) : null
             })}
-            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #2a2a38', background: 'transparent', color: safePage === totalPages ? '#44445a' : '#9999b0', cursor: safePage === totalPages ? 'default' : 'pointer', fontSize: 12 }}>›</button>
-            <button onClick={() => setPage(totalPages)} disabled={safePage === totalPages} style={{ padding: '5px 10px', borderRadius: 6, border: '1px solid #2a2a38', background: 'transparent', color: safePage === totalPages ? '#44445a' : '#9999b0', cursor: safePage === totalPages ? 'default' : 'pointer', fontSize: 12 }}>»</button>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="pv-page-btn">›</button>
+            <button onClick={() => setPage(totalPages)} disabled={safePage === totalPages} className="pv-page-btn">»</button>
           </div>
         </div>
       )}

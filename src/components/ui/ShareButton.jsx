@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { toCanvas } from 'html-to-image'
+import './ShareButton.css'
 
 export default function ShareButton({ targetRef, title = 'VillaPadel', filename = 'villapadel' }) {
   const [loading, setLoading] = useState(false)
@@ -49,24 +50,10 @@ export default function ShareButton({ targetRef, title = 'VillaPadel', filename 
   }
 
   return (
-    <button
-      onClick={handleShare}
-      disabled={loading}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '7px 14px', borderRadius: 8,
-        background: loading ? 'rgba(37,211,102,0.08)' : 'rgba(37,211,102,0.12)',
-        border: '1px solid rgba(37,211,102,0.3)',
-        color: '#25d366', fontSize: 13, fontWeight: 600,
-        cursor: loading ? 'wait' : 'pointer', transition: 'all 0.15s',
-      }}
-      onMouseEnter={e => { if (!loading) { e.currentTarget.style.background = '#25d366'; e.currentTarget.style.color = '#fff' } }}
-      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(37,211,102,0.12)'; e.currentTarget.style.color = '#25d366' }}
-    >
+    <button onClick={handleShare} disabled={loading} className="sb-btn">
       {loading ? (
         <>
-          <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid #25d366', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.6s linear infinite' }} />
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          <span className="sb-spinner" />
           Generando...
         </>
       ) : (

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { collection, getDocs, query, orderBy } from 'firebase/firestore'
 import { db } from '../../firebase/config'
 import Spinner from '../ui/Spinner'
+import './CategoriesView.css'
 
 const CAT_OPTIONS = [
   { id: 'cat-8va', name: '8va Categoría', valor: 8, color: '#64748b' },
@@ -23,8 +24,8 @@ function getTorneoColor(t) {
 }
 
 const STATUS_STYLE = {
-  'En curso':    { bg: 'rgba(34,197,94,0.12)',  color: '#22c55e', border: 'rgba(34,197,94,0.25)' },
-  'Inscripción': { bg: 'rgba(249,115,22,0.12)', color: '#f97316', border: 'rgba(249,115,22,0.25)' },
+  'En curso':    { bg: 'rgba(34,197,94,0.12)',   color: '#22c55e',  border: 'rgba(34,197,94,0.25)' },
+  'Inscripción': { bg: 'rgba(249,115,22,0.12)',  color: '#f97316',  border: 'rgba(249,115,22,0.25)' },
   'Finalizado':  { bg: 'rgba(156,163,175,0.12)', color: '#9ca3af', border: 'rgba(156,163,175,0.25)' },
 }
 
@@ -34,43 +35,37 @@ function TorneoCard({ torneo }) {
   const st = STATUS_STYLE[torneo.estado] || STATUS_STYLE['Inscripción']
 
   return (
-    <div style={{
-      background: '#1a1a22', borderRadius: 14, border: '1px solid #2a2a38',
-      overflow: 'hidden', transition: 'border-color 0.2s, transform 0.15s',
-    }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = col; e.currentTarget.style.transform = 'translateY(-2px)' }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a38'; e.currentTarget.style.transform = 'translateY(0)' }}
+    <div
+      className="cv-card"
+      onMouseEnter={e => { e.currentTarget.style.borderColor = col }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a38' }}
     >
-      <div style={{ height: 3, background: col }} />
-      <div style={{ padding: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
-          <h3 style={{ color: '#f1f1f5', fontSize: 15, fontWeight: 700, margin: 0, lineHeight: 1.3, flex: 1, paddingRight: 12 }}>
-            {torneo.nombre}
-          </h3>
-          <span style={{ fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: st.bg, color: st.color, border: `1px solid ${st.border}`, whiteSpace: 'nowrap' }}>
+      <div className="cv-card-top-bar" style={{ background: col }} />
+      <div className="cv-card-body">
+        <div className="cv-card-header-row">
+          <h3 className="cv-card-title">{torneo.nombre}</h3>
+          <span className="cv-card-status" style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}` }}>
             {torneo.estado}
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: `${col}18`, border: `1px solid ${col}40`, color: col, fontSize: 11, fontWeight: 600 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: col, display: 'inline-block' }} />
+        <div className="cv-meta-row">
+          <span className="cv-cat-badge" style={{ background: `${col}18`, border: `1px solid ${col}40`, color: col }}>
+            <span className="cv-cat-dot" style={{ background: col }} />
             {torneo.categoriaName}
           </span>
-          {torneo.fechaInicio && (
-            <span style={{ color: '#9999b0', fontSize: 12 }}>📅 {torneo.fechaInicio}</span>
-          )}
+          {torneo.fechaInicio && <span className="cv-card-date">📅 {torneo.fechaInicio}</span>}
         </div>
 
-        <div style={{ display: 'flex', gap: 16, paddingTop: 14, borderTop: '1px solid #2a2a38' }}>
+        <div className="cv-card-stats">
           {[
             { label: 'Zonas', value: torneo.zonas ?? '—' },
             { label: '$/jugador', value: torneo.costoPorJugador ? `$${Number(torneo.costoPorJugador).toLocaleString()}` : '—' },
             { label: 'Nivel', value: torneo.categoriaValor ?? (cat?.valor ?? '—') },
           ].map(s => (
             <div key={s.label}>
-              <div style={{ color: '#f1f1f5', fontSize: 18, fontWeight: 800, lineHeight: 1 }}>{s.value}</div>
-              <div style={{ color: '#9999b0', fontSize: 11, marginTop: 3 }}>{s.label}</div>
+              <div className="cv-card-stat-value">{s.value}</div>
+              <div className="cv-card-stat-label">{s.label}</div>
             </div>
           ))}
         </div>
@@ -98,40 +93,38 @@ export default function CategoriesView() {
   const inscripcion = torneos.filter(t => t.estado === 'Inscripción').length
 
   return (
-    <div style={{ maxWidth: 1280, margin: '0 auto', padding: '32px 24px' }}>
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ color: '#f1f1f5', fontSize: 28, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.5px' }}>
-          Torneos
-        </h1>
-        <p style={{ color: '#9999b0', fontSize: 14, margin: 0 }}>
+    <div className="cv-page">
+      <div className="cv-header">
+        <h1 className="cv-title">Torneos</h1>
+        <p className="cv-subtitle">
           {torneos.length} torneo{torneos.length !== 1 ? 's' : ''} · {enCurso} en curso · {inscripcion} en inscripción
         </p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 28 }}>
+      <div className="cv-stats-grid">
         {[
           { label: 'Total torneos', value: torneos.length, icon: '🏆' },
           { label: 'En curso', value: enCurso, icon: '▶️' },
           { label: 'En inscripción', value: inscripcion, icon: '📋' },
         ].map(s => (
-          <div key={s.label} style={{ background: '#1a1a22', border: '1px solid #2a2a38', borderRadius: 10, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 40, height: 40, borderRadius: 8, background: 'rgba(249,115,22,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>{s.icon}</div>
+          <div key={s.label} className="cv-stat-card">
+            <div className="cv-stat-icon">{s.icon}</div>
             <div>
-              <div style={{ color: '#f1f1f5', fontSize: 22, fontWeight: 800, lineHeight: 1 }}>{s.value}</div>
-              <div style={{ color: '#9999b0', fontSize: 12, marginTop: 2 }}>{s.label}</div>
+              <div className="cv-stat-value">{s.value}</div>
+              <div className="cv-stat-label">{s.label}</div>
             </div>
           </div>
         ))}
       </div>
 
       {torneos.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 60, background: '#1a1a22', borderRadius: 12, border: '1px dashed #2a2a38', color: '#9999b0' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🎾</div>
-          <p style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 600, color: '#f1f1f5' }}>No hay torneos</p>
-          <p style={{ margin: 0, fontSize: 14 }}>Los administradores pueden crear torneos desde el Panel Admin.</p>
+        <div className="cv-empty">
+          <div className="cv-empty-icon">🎾</div>
+          <p className="cv-empty-title">No hay torneos</p>
+          <p className="cv-empty-desc">Los administradores pueden crear torneos desde el Panel Admin.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+        <div className="cv-torneos-grid">
           {torneos.map(t => <TorneoCard key={t.id} torneo={t} />)}
         </div>
       )}

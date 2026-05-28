@@ -1,0 +1,163 @@
+/* ─── JugadoresAdmin.css ─── */
+
+/* Page header */
+.ja-page-title { color: #f1f1f5; font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+.ja-page-desc { color: #9999b0; font-size: 13px; margin: 0; }
+
+/* Add/Edit form panel */
+.ja-form-panel { background: #13131a; border: 1px solid #2a2a38; border-radius: 12px; padding: 18px; margin-bottom: 20px; }
+.ja-form-heading { color: #9999b0; font-size: 12px; font-weight: 600; text-transform: uppercase; margin-bottom: 12px; }
+.ja-form-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.ja-field { }
+.ja-field-label { color: #9999b0; font-size: 11px; font-weight: 600; margin-bottom: 5px; }
+
+/* Sexo toggle */
+.ja-sexo-group {
+  display: flex;
+  background: #0f0f13;
+  border: 1px solid #2a2a38;
+  border-radius: 6px;
+  padding: 3px;
+  gap: 3px;
+}
+.ja-sexo-btn {
+  flex: 1;
+  padding: 4px 0;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.15s;
+  background: transparent;
+  color: #9999b0;
+}
+
+/* Category preview dot */
+.ja-cat-preview {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; border-radius: 6px;
+}
+.ja-cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.ja-cat-label { font-size: 12px; font-weight: 600; }
+
+/* Form buttons */
+.ja-form-actions { display: flex; gap: 8px; }
+.ja-btn-cancel {
+  background: transparent; border: 1px solid #2a2a38; border-radius: 8px;
+  color: #9999b0; font-size: 13px; padding: 7px 14px; cursor: pointer;
+}
+.ja-btn-save {
+  background: #f97316; color: #fff; border: none; border-radius: 8px;
+  padding: 7px 18px; font-size: 13px; font-weight: 600;
+}
+.ja-btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Filter/search bar */
+.ja-filter-section { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+.ja-search-wrap { position: relative; max-width: 320px; }
+.ja-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #6666a0; font-size: 13px; }
+.ja-filter-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.ja-filter-label { color: #6666a0; font-size: 11px; font-weight: 600; }
+.ja-pagesize-group { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.ja-pagesize-label { color: #6666a0; font-size: 12px; }
+.ja-pagesize-btn {
+  padding: 4px 10px; border-radius: 6px; border: 1px solid #2a2a38;
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+  background: transparent; color: #9999b0;
+}
+.ja-pagesize-btn.active { background: #f97316; color: #fff; border-color: #f97316; }
+
+/* Empty state */
+.ja-empty { text-align: center; padding: 48px; background: #13131a; border-radius: 12px; border: 1px dashed #2a2a38; color: #9999b0; }
+
+/* Mobile cards grid */
+.ja-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.ja-card { background: #13131a; border-radius: 10px; padding: 12px 14px; }
+.ja-card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+.ja-card-name { color: #f1f1f5; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 5px; }
+.ja-card-location { color: #9999b0; font-size: 11px; margin-top: 2px; }
+.ja-card-btn-group { display: flex; gap: 4px; }
+.ja-icon-btn {
+  background: transparent; border: none; color: #9999b0;
+  cursor: pointer; font-size: 14px; padding: 3px 5px; border-radius: 4px;
+}
+.ja-card-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* Category badge */
+.ja-cat-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 20px;
+  font-size: 11px; font-weight: 600;
+}
+.ja-cat-badge-dot { width: 5px; height: 5px; border-radius: 50%; }
+.ja-cat-badge-level { border-radius: 8px; padding: 0 5px; font-size: 10px; font-weight: 800; }
+
+/* Sexo badge */
+.ja-sexo-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
+
+/* Ascenso button */
+.ja-ascenso-btn {
+  cursor: pointer; font-size: 12px; font-weight: 700;
+  padding: 2px 7px; border-radius: 6px; line-height: 1;
+  transition: all 0.15s;
+}
+
+/* Desktop table */
+.ja-table-wrap { background: #13131a; border-radius: 12px; border: 1px solid #2a2a38; overflow: hidden; }
+.ja-table-head {
+  display: grid;
+  grid-template-columns: 44px 1fr 130px 44px 200px 44px 80px;
+  padding: 0 16px; height: 40px;
+  border-bottom: 1px solid #2a2a38; background: #0f0f13;
+  align-items: center; gap: 10px;
+}
+.ja-th { color: #6666a0; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+.ja-th-ascenso { color: #22c55e; font-size: 11px; font-weight: 600; text-transform: uppercase; text-align: center; }
+.ja-table-row {
+  display: grid;
+  grid-template-columns: 44px 1fr 130px 44px 200px 44px 80px;
+  padding: 0 16px; height: 54px; align-items: center; gap: 10px;
+  transition: background 0.12s;
+}
+.ja-row-num { color: #44445a; font-size: 12px; font-weight: 600; }
+.ja-row-name { color: #f1f1f5; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.ja-row-location { color: #9999b0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ja-row-ascenso-cell { display: flex; justify-content: center; }
+.ja-row-actions { display: flex; gap: 6px; }
+.ja-ascenso-upgrade { color: #22c55e; font-size: 12px; font-weight: 700; }
+.ja-table-icon-btn {
+  background: transparent; border: none; color: #9999b0;
+  cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: 4px;
+}
+
+/* Pagination */
+.ja-pagination { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; color: #9999b0; font-size: 12px; }
+.ja-pagination-btns { display: flex; gap: 4px; }
+.ja-page-btn {
+  padding: 4px 8px; border-radius: 6px; border: 1px solid #2a2a38;
+  background: transparent; color: #9999b0; cursor: pointer; font-size: 12px;
+}
+.ja-page-btn:disabled { color: #44445a; cursor: default; }
+.ja-page-num-btn {
+  padding: 4px 10px; border-radius: 6px; border: 1px solid #2a2a38;
+  background: transparent; color: #9999b0; cursor: pointer; font-size: 12px;
+}
+.ja-page-num-btn.active { background: #f97316; color: #fff; border-color: #f97316; }
+
+/* Form input */
+.ja-inp {
+  background: #13131a; border: 1px solid #2a2a38; border-radius: 6px;
+  padding: 6px 10px; color: #f1f1f5; font-size: 13px;
+  outline: none; width: 100%; box-sizing: border-box;
+}
+
+/* Delete confirm modal */
+.ja-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: flex; align-items: center; justify-content: center; z-index: 1100; }
+.ja-modal { background: #1a1a22; border: 1px solid #2a2a38; border-radius: 12px; padding: 28px; max-width: 360px; text-align: center; }
+.ja-modal-icon { font-size: 32px; margin-bottom: 12px; }
+.ja-modal-title { color: #f1f1f5; margin: 0 0 8px; }
+.ja-modal-desc { color: #9999b0; font-size: 14px; margin: 0 0 20px; }
+.ja-modal-actions { display: flex; gap: 10px; justify-content: center; }
+.ja-modal-cancel { background: transparent; border: 1px solid #2a2a38; border-radius: 8px; color: #9999b0; font-size: 13px; padding: 8px 18px; cursor: pointer; }
+.ja-modal-confirm { background: #ef4444; color: #fff; border: none; border-radius: 8px; padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer; }

@@ -5,6 +5,7 @@ import { useIsMobile } from '../../hooks/useIsMobile'
 import Logo from '../../assets/nuevologo.png'
 import Logofondo from '../../assets/logofondoSB.png'
 import BgImg from '../../assets/background.png'
+import './LandingView.css'
 
 const IconGrupos = (s) => (
   <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -65,41 +66,37 @@ function MatchRow({ match, last }) {
 
   return (
     <div className="match-row" style={{ borderBottom: last ? 'none' : undefined }}>
-      <div style={{ textAlign: 'right' }}>
-        <div style={{ fontSize: 13, fontWeight: aWon ? 600 : 400, color: aWon ? '#fff' : 'rgba(255,255,255,.52)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <div className="lv-player-cell-r">
+        <div className="lv-player-p1" style={{ fontWeight: aWon ? 600 : 400, color: aWon ? '#fff' : 'rgba(255,255,255,.52)' }}>
           {match.duplaA?.jugador1}
         </div>
-        <div style={{ fontSize: 11, color: aWon ? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.28)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>
+        <div className="lv-player-p2" style={{ color: aWon ? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.28)' }}>
           {match.duplaA?.jugador2}
         </div>
       </div>
 
-      <div style={{ textAlign: 'center', minWidth: 64 }}>
+      <div className="lv-score-center">
         {live ? (
           <span className="badge badge-live" style={{ whiteSpace: 'nowrap' }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', display: 'inline-block', flexShrink: 0 }} />
+            <span className="lv-live-dot" />
             EN VIVO
           </span>
         ) : fin ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, justifyContent: 'center' }}>
-            <span style={{ fontSize: 22, fontWeight: 800, color: aWon ? 'var(--orange-light)' : 'rgba(255,255,255,.28)' }}>
-              {match.resultado?.setsA}
-            </span>
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,.18)' }}>–</span>
-            <span style={{ fontSize: 22, fontWeight: 800, color: bWon ? 'var(--orange-light)' : 'rgba(255,255,255,.28)' }}>
-              {match.resultado?.setsB}
-            </span>
+          <div className="lv-score-display">
+            <span className="lv-score-num" style={{ color: aWon ? 'var(--orange-light)' : 'rgba(255,255,255,.28)' }}>{match.resultado?.setsA}</span>
+            <span className="lv-score-sep">–</span>
+            <span className="lv-score-num" style={{ color: bWon ? 'var(--orange-light)' : 'rgba(255,255,255,.28)' }}>{match.resultado?.setsB}</span>
           </div>
         ) : (
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,.22)', fontWeight: 600 }}>vs</span>
+          <span className="lv-score-vs">vs</span>
         )}
       </div>
 
-      <div style={{ textAlign: 'left' }}>
-        <div style={{ fontSize: 13, fontWeight: bWon ? 600 : 400, color: bWon ? '#fff' : 'rgba(255,255,255,.52)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <div className="lv-player-cell-l">
+        <div className="lv-player-p1" style={{ fontWeight: bWon ? 600 : 400, color: bWon ? '#fff' : 'rgba(255,255,255,.52)' }}>
           {match.duplaB?.jugador1}
         </div>
-        <div style={{ fontSize: 11, color: bWon ? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.28)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>
+        <div className="lv-player-p2" style={{ color: bWon ? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.28)' }}>
           {match.duplaB?.jugador2}
         </div>
       </div>
@@ -123,35 +120,24 @@ export default function LandingView() {
 
   return (
     <div>
-
       {/* ── HERO ── */}
       <div className="hero-section" style={{ minHeight: isMobile ? 520 : 720 }}>
-        <div
-          className="hero-bg"
-          style={{ backgroundImage: `url(${BgImg})` }}
-        />
+        <div className="hero-bg" style={{ backgroundImage: `url(${BgImg})` }} />
         <div className="hero-overlay" />
         <div className="hero-glow-orange" />
         <div className="hero-glow-blue" />
 
         <div className="hero-content" style={{ padding: isMobile ? '52px 18px 44px' : undefined }}>
-          <img
-            src={Logofondo}
-            alt="VillaPadel"
-            className="hero-logo animate-fadein"
-            style={{ height: isMobile ? 72 : 92 }}
-          />
+          <img src={Logofondo} alt="VillaPadel" className="hero-logo animate-fadein" style={{ height: isMobile ? 72 : 92 }} />
 
           <h1 className="hero-title animate-fadein-delay-1">
-            Villa
-            <span className="hero-title-accent">Padel</span>
+            Villa<span className="hero-title-accent">Padel</span>
           </h1>
 
           <p className="hero-desc animate-fadein-delay-2" style={{ fontSize: isMobile ? 14 : undefined }}>
             Seguí los torneos, resultados y tabla de posiciones de VillaPadel Club.
           </p>
 
-          {/* Stats bar */}
           <div className="hero-stats animate-fadein-delay-3" style={{ gap: isMobile ? 20 : undefined, padding: isMobile ? '15px 22px' : undefined }}>
             <StatItem value={torneos.length} label="Torneos" />
             <div className="stat-divider" />
@@ -163,35 +149,15 @@ export default function LandingView() {
       </div>
 
       {/* ── BODY ── */}
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: isMobile ? '28px 14px 64px' : '44px 24px 72px' }}>
+      <div className="lv-body" style={{ padding: isMobile ? '28px 14px 64px' : '44px 24px 72px' }}>
 
-        {/* Feature cards */}
-        <div style={{ marginBottom: 36 }}>
-          <p style={{
-            color: '#f97316',
-            fontSize: 11,
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '1.5px',
-            margin: '0 0 8px',
-          }}>
-            Explorá la plataforma
-          </p>
-          <h2 style={{
-            fontSize: isMobile ? 18 : 22,
-            fontWeight: 800,
-            color: '#fff',
-            margin: '0 0 20px',
-            letterSpacing: '-0.3px',
-          }}>
+        <div className="lv-features-section">
+          <p className="lv-features-label">Explorá la plataforma</p>
+          <h2 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: '#fff', margin: '0 0 20px', letterSpacing: '-0.3px' }}>
             Todo lo que encontrás en VillaPadel
           </h2>
 
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)',
-            gap: isMobile ? 10 : 14,
-          }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: isMobile ? 10 : 14 }}>
             {FEATURES.map((f, i) => (
               <div
                 key={f.title}
@@ -222,43 +188,21 @@ export default function LandingView() {
           </div>
         </div>
 
-        {/* CTA */}
-        <div style={{ textAlign: 'center', marginBottom: 48 }}>
-          <button
-            className="btn-primary"
-            onClick={() => navigate('/torneos')}
-            style={{ padding: isMobile ? '13px 36px' : undefined }}
-          >
+        <div className="lv-cta">
+          <button className="btn-primary" onClick={() => navigate('/torneos')} style={{ padding: isMobile ? '13px 36px' : undefined }}>
             Ver torneos →
           </button>
         </div>
 
-        {/* Partidos */}
         {partidosDestacados.length > 0 && (
-          <div
-            className="match-section animate-fadein"
-            style={{
-              background: '#15151e',
-              border: '1px solid rgba(255,255,255,0.05)',
-              borderTop: '2px solid #f97316',
-              borderRadius: 12,
-              boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
-            }}
-          >
+          <div className="match-section lv-match-section animate-fadein">
             <div className="match-section-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-display)' }}>
-                  Partidos recientes
-                </span>
-                {activeTorneo && (
-                  <span style={{ color: 'rgba(255,255,255,.38)', fontSize: 12 }}>{activeTorneo.nombre}</span>
-                )}
+              <div className="lv-match-header-inner">
+                <span className="lv-recent-title">Partidos recientes</span>
+                {activeTorneo && <span className="lv-recent-torneo">{activeTorneo.nombre}</span>}
               </div>
               {activeTorneo && (
-                <button
-                  className="btn-text-link"
-                  onClick={() => navigate(`/torneos/${activeTorneo.id}`)}
-                >
+                <button className="btn-text-link" onClick={() => navigate(`/torneos/${activeTorneo.id}`)}>
                   Ver todos →
                 </button>
               )}

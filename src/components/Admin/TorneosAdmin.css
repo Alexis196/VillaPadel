@@ -1,0 +1,507 @@
+/* ─── TorneosAdmin.css ─── */
+
+/* Form inputs */
+.ta-input {
+  background: #16161e;
+  border: 1px solid #2a2a38;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #f1f1f5;
+  font-size: 14px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.ta-input:focus { border-color: #f97316; }
+
+/* Form label */
+.ta-label {
+  color: #9999b0;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+/* Compact row input (inside modals/tables) */
+.ta-row-input {
+  background: #16161e;
+  border: 1px solid #2a2a38;
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: #f1f1f5;
+  font-size: 12px;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Toggle button group */
+.ta-toggle-group {
+  display: flex;
+  background: #13131a;
+  border: 1px solid #2a2a38;
+  border-radius: 8px;
+  padding: 4px;
+  gap: 4px;
+}
+.ta-toggle {
+  flex: 1;
+  padding: 8px 0;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  background: transparent;
+  color: #9999b0;
+  transition: all 0.15s;
+}
+.ta-toggle.active { background: #f97316; color: #fff; }
+
+/* Form field group */
+.ta-field { margin-bottom: 18px; }
+
+/* Modal overlay */
+.ta-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 20px;
+}
+.ta-modal-overlay.bottom { align-items: flex-end; padding: 0; }
+
+/* Modal container */
+.ta-modal {
+  background: #1a1a22;
+  border-radius: 14px;
+  border: 1px solid #2a2a38;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+.ta-modal.mobile-sheet {
+  border-radius: 14px 14px 0 0;
+  max-height: 95vh;
+}
+
+/* Modal header */
+.ta-modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #2a2a38;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.ta-modal-title { color: #f1f1f5; font-size: 18px; font-weight: 700; margin: 0; }
+.ta-modal-subtitle { color: #9999b0; font-size: 13px; margin: 3px 0 0; }
+.ta-modal-close {
+  background: transparent;
+  border: none;
+  color: #9999b0;
+  cursor: pointer;
+  font-size: 22px;
+}
+
+/* Modal body */
+.ta-modal-body { padding: 24px; overflow-y: auto; flex: 1; }
+.ta-modal-body-scroll { flex: 1; overflow-y: auto; padding: 12px 24px; }
+
+/* Modal footer */
+.ta-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #2a2a38;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ta-modal-footer-actions { display: flex; gap: 10px; }
+
+/* Confirm modal */
+.ta-confirm-modal {
+  background: #1a1a22;
+  border: 1px solid #2a2a38;
+  border-radius: 14px;
+  padding: 32px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+}
+.ta-confirm-icon { font-size: 36px; margin-bottom: 12px; }
+.ta-confirm-title { color: #f1f1f5; font-size: 18px; font-weight: 700; margin: 0 0 8px; }
+.ta-confirm-name { color: #9999b0; font-size: 14px; margin: 0 0 6px; }
+.ta-confirm-desc { color: #9999b0; font-size: 13px; margin: 0 0 24px; }
+.ta-confirm-actions { display: flex; gap: 10px; justify-content: center; }
+
+/* Buttons */
+.ta-btn-primary {
+  background: #f97316;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ta-btn-primary:disabled { opacity: 0.7; cursor: wait; }
+.ta-btn-secondary {
+  background: transparent;
+  border: 1px solid #2a2a38;
+  border-radius: 8px;
+  color: #9999b0;
+  font-size: 13px;
+  padding: 9px 18px;
+  cursor: pointer;
+}
+.ta-btn-danger {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ta-btn-danger:disabled { opacity: 0.7; cursor: wait; }
+.ta-btn-purple {
+  background: #8b5cf6;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ta-btn-purple:disabled { opacity: 0.7; cursor: wait; }
+.ta-btn-green {
+  background: #10b981;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ta-btn-green:disabled { opacity: 0.7; cursor: wait; }
+
+/* AddDuplas col headers */
+.ta-dupla-thead {
+  padding: 10px 24px 4px;
+  background: #13131a;
+  border-bottom: 1px solid #2a2a38;
+}
+.ta-dupla-thead-row {
+  display: grid;
+  grid-template-columns: 26px 1fr 96px 116px 76px 32px;
+  gap: 6px;
+}
+.ta-dupla-th { color: #6666a0; font-size: 10px; font-weight: 600; text-transform: uppercase; padding-bottom: 6px; }
+
+/* Dupla row */
+.ta-dupla-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: stretch; }
+.ta-dupla-card {
+  flex: 1;
+  background: #13131a;
+  border-radius: 8px;
+  border: 1px solid #2a2a38;
+  padding: 10px 12px;
+}
+.ta-dupla-remove {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.2);
+  color: #ef4444;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  width: 32px;
+  align-self: stretch;
+}
+.ta-add-dupla-btn {
+  background: transparent;
+  border: 1px dashed #2a2a38;
+  border-radius: 8px;
+  color: #9999b0;
+  font-size: 13px;
+  padding: 8px 16px;
+  cursor: pointer;
+  width: 100%;
+}
+
+/* Desktop pago row */
+.ta-pago-row-desktop {
+  display: grid;
+  grid-template-columns: 26px 1fr 96px 116px 76px;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Player search dropdown */
+.ta-player-dropdown {
+  position: fixed;
+  z-index: 9999;
+  background: #1a1a22;
+  border: 1px solid #3a3a50;
+  border-radius: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+}
+.ta-player-option {
+  padding: 7px 12px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #1c1c28;
+}
+.ta-player-name {
+  color: #f1f1f5;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-right: 6px;
+}
+.ta-player-cat { font-size: 10px; font-weight: 600; flex-shrink: 0; }
+.ta-player-no-results { padding: 8px 12px; color: #9999b0; font-size: 12px; }
+
+/* Done step */
+.ta-done-step { padding: 48px; text-align: center; }
+.ta-done-icon { font-size: 48px; margin-bottom: 16px; }
+.ta-done-title { color: #22c55e; font-size: 20px; font-weight: 700; margin: 0 0 8px; }
+.ta-done-desc { color: #9999b0; margin: 0 0 24px; font-size: 14px; }
+
+/* Error text */
+.ta-error { color: #ef4444; font-size: 13px; margin-bottom: 12px; }
+.ta-error-inline { color: #ef4444; font-size: 13px; margin-top: 10px; }
+
+/* Detail view */
+.ta-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: #9999b0;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 0;
+  margin-bottom: 20px;
+}
+.ta-detail-header { margin-bottom: 24px; }
+.ta-detail-title { color: #f1f1f5; font-size: 22px; font-weight: 700; margin: 0 0 8px; }
+.ta-detail-accent { height: 3px; width: 36px; border-radius: 2px; margin-bottom: 10px; }
+.ta-detail-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ta-detail-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ta-status-badge { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+.ta-americano-badge {
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: rgba(167,139,250,0.15);
+  border: 1px solid rgba(167,139,250,0.35);
+  color: #a78bfa;
+  font-size: 12px;
+  font-weight: 600;
+}
+.ta-meta-text { color: #9999b0; font-size: 12px; }
+
+/* Stats grid */
+.ta-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.ta-stat-card {
+  background: #13131a;
+  border: 1px solid #2a2a38;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.ta-stat-value { color: #f1f1f5; font-size: 22px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+.ta-stat-label { color: #9999b0; font-size: 11px; }
+
+/* Section heading */
+.ta-section-heading {
+  color: #9999b0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 12px;
+}
+
+/* Action cards grid */
+.ta-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.ta-action-card {
+  background: #13131a;
+  border-radius: 12px;
+  padding: 18px 20px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+.ta-action-card-icon { font-size: 22px; margin-bottom: 8px; }
+.ta-action-card-title { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
+.ta-action-card-desc { color: #9999b0; font-size: 12px; }
+
+/* Danger zone */
+.ta-danger-zone { border-top: 1px solid #2a2a38; padding-top: 20px; }
+
+/* List view header */
+.ta-list-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.ta-list-title { color: #f1f1f5; font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+.ta-list-desc { color: #9999b0; font-size: 13px; margin: 0; }
+.ta-new-btn {
+  background: #f97316;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(249,115,22,0.3);
+}
+
+/* Summary stats row */
+.ta-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.ta-summary-card {
+  background: #13131a;
+  border: 1px solid #2a2a38;
+  border-radius: 10px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ta-summary-value { color: #f1f1f5; font-size: 28px; font-weight: 800; }
+.ta-summary-label { color: #9999b0; font-size: 12px; }
+
+/* Empty torneos state */
+.ta-empty {
+  text-align: center;
+  padding: 48px;
+  background: #13131a;
+  border-radius: 12px;
+  border: 1px dashed #2a2a38;
+  color: #9999b0;
+}
+.ta-empty-icon { font-size: 36px; margin-bottom: 10px; }
+.ta-empty-text { margin: 0; font-size: 14px; }
+
+/* Torneo cards grid */
+.ta-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.ta-card {
+  background: #13131a;
+  border-radius: 12px;
+  border: 1px solid #2a2a38;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.ta-card-accent { height: 3px; }
+.ta-card-body { padding: 14px 16px; }
+.ta-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.ta-card-title { color: #f1f1f5; font-size: 13px; font-weight: 700; margin: 0; flex: 1; padding-right: 8px; line-height: 1.4; }
+.ta-card-meta { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.ta-card-footer { display: flex; justify-content: flex-end; }
+.ta-card-footer-text { color: #555570; font-size: 11px; }
+
+/* Preview bar (category preview in form) */
+.ta-preview-bar {
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ta-preview-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.ta-preview-text { font-size: 13px; font-weight: 600; }
+.ta-preview-date { color: #9999b0; font-size: 12px; margin-left: auto; }
+
+/* Suma badge */
+.ta-suma-badge { color: #8b5cf6; font-weight: 600; margin-left: 8px; }
+.ta-americano-note { color: #a78bfa; font-size: 11px; margin: 5px 0 0; }
+.ta-suma-note { color: #9999b0; font-size: 11px; margin: 4px 0 0; }
+
+/* Suma validity badge in dupla row */
+.ta-suma-valid { color: #22c55e; background: rgba(34,197,94,0.12); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+.ta-suma-invalid { color: #ef4444; background: rgba(239,68,68,0.1); padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+
+/* Confirm modal badges */
+.ta-confirm-badge-orange {
+  background: rgba(249,115,22,0.1);
+  border: 1px solid rgba(249,115,22,0.25);
+  color: #f97316;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+.ta-confirm-badge-purple {
+  background: rgba(139,92,246,0.1);
+  border: 1px solid rgba(139,92,246,0.25);
+  color: #8b5cf6;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+.ta-confirm-badge-green {
+  background: rgba(16,185,129,0.1);
+  border: 1px solid rgba(16,185,129,0.25);
+  color: #10b981;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+}
+.ta-confirm-badges { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }
+.ta-confirm-error { color: #ef4444; font-size: 13px; margin: 0 0 24px; }

@@ -5,6 +5,7 @@ import { useIsMobile } from '../../hooks/useIsMobile'
 import { saveLlaveResultado } from '../../firebase/torneoService'
 import Spinner from '../ui/Spinner'
 import ShareButton from '../ui/ShareButton'
+import './BracketView.css'
 
 const CARD_W = 224
 const BASE_H = 120
@@ -14,30 +15,16 @@ const HALF = CONN_W / 2
 
 function TeamRow({ team, pts, isWinner }) {
   if (!team) {
-    return (
-      <div style={{ padding: '10px 12px', color: '#3a3a50', fontSize: 12, fontStyle: 'italic' }}>
-        Por definir
-      </div>
-    )
+    return <div className="bv-team-empty">Por definir</div>
   }
   return (
-    <div style={{ padding: '8px 12px', background: isWinner ? 'rgba(249,115,22,0.08)' : 'transparent', display: 'flex', alignItems: 'center', gap: 6 }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.25, color: isWinner ? '#f97316' : '#f1f1f5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {team.jugador1}
-        </div>
-        <div style={{ fontSize: 11, color: '#9999b0', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {team.jugador2}
-        </div>
+    <div className="bv-team-row" style={{ background: isWinner ? 'rgba(249,115,22,0.08)' : 'transparent' }}>
+      <div className="bv-team-names">
+        <div className="bv-team-p1" style={{ color: isWinner ? '#f97316' : '#f1f1f5' }}>{team.jugador1}</div>
+        <div className="bv-team-p2" style={{ color: isWinner ? '#f97316' : '#f1f1f5' }}>{team.jugador2}</div>
       </div>
-      {team.seed != null && (
-        <span style={{ fontSize: 9, color: '#6a6a80', fontWeight: 700, flexShrink: 0 }}>S{team.seed}</span>
-      )}
-      {pts != null && (
-        <span style={{ fontSize: 15, fontWeight: 800, flexShrink: 0, minWidth: 18, textAlign: 'right', color: isWinner ? '#f97316' : '#6a6a80' }}>
-          {pts}
-        </span>
-      )}
+      {team.seed != null && <span className="bv-team-seed">S{team.seed}</span>}
+      {pts != null && <span className="bv-team-pts" style={{ color: isWinner ? '#f97316' : '#6a6a80' }}>{pts}</span>}
     </div>
   )
 }
@@ -53,28 +40,21 @@ function MatchCard({ llave, isAdmin, onEdit }) {
   return (
     <div
       onClick={canEdit ? onEdit : undefined}
-      style={{
-        background: '#1a1a22',
-        border: `1px solid ${played ? 'rgba(249,115,22,0.25)' : '#2a2a38'}`,
-        borderRadius: 10, overflow: 'hidden',
-        cursor: canEdit ? 'pointer' : 'default',
-        transition: 'border-color 0.15s, box-shadow 0.15s',
-      }}
+      className="bv-match-card"
+      style={{ border: `1px solid ${played ? 'rgba(249,115,22,0.25)' : '#2a2a38'}`, cursor: canEdit ? 'pointer' : 'default' }}
       onMouseEnter={e => { if (canEdit) { e.currentTarget.style.borderColor = '#f97316'; e.currentTarget.style.boxShadow = '0 0 12px rgba(249,115,22,0.12)' } }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = played ? 'rgba(249,115,22,0.25)' : '#2a2a38'; e.currentTarget.style.boxShadow = 'none' }}
     >
-      <div style={{ padding: '4px 10px', background: '#13131a', borderBottom: '1px solid #2a2a38', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
-        <span style={{ fontSize: 9, fontWeight: 700, color: '#6a6a80', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-          {llave.roundName}
-        </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          {llave.estado === 'W.O.' && <span style={{ fontSize: 9, color: '#f59e0b', fontWeight: 700 }}>W.O.</span>}
-          {isBye && <span style={{ fontSize: 9, color: '#6366f1', fontWeight: 700 }}>BYE</span>}
-          {canEdit && <span style={{ fontSize: 10, color: '#f97316', opacity: 0.7 }}>✎</span>}
+      <div className="bv-match-header">
+        <span className="bv-round-label">{llave.roundName}</span>
+        <div className="bv-header-badges">
+          {llave.estado === 'W.O.' && <span className="bv-wo-badge">W.O.</span>}
+          {isBye && <span className="bv-bye-badge">BYE</span>}
+          {canEdit && <span className="bv-edit-icon">✎</span>}
         </div>
       </div>
       <TeamRow team={llave.duplaA} pts={played ? llave.ptsA : null} isWinner={winnerA} />
-      <div style={{ height: 1, background: '#20202c', margin: '0 8px' }} />
+      <div className="bv-row-divider" />
       <TeamRow team={llave.duplaB} pts={played ? llave.ptsB : null} isWinner={winnerB} />
     </div>
   )
@@ -109,51 +89,28 @@ function BracketSlot({ llave, roundIdx, matchIdx, totalRounds, isAdmin, onEdit }
 
 function ChampionCard({ champion, compact = false }) {
   return (
-    <div style={{
-      position: 'relative',
-      background: 'linear-gradient(160deg, rgba(251,191,36,0.1) 0%, #141208 40%, rgba(249,115,22,0.06) 100%)',
-      border: '1px solid rgba(251,191,36,0.38)',
+    <div className="bv-champion" style={{
       borderRadius: compact ? 12 : 16,
       padding: compact ? '18px 14px' : '32px 28px',
-      textAlign: 'center',
-      overflow: 'hidden',
       width: compact ? CARD_W : undefined,
-      boxShadow: '0 0 40px rgba(251,191,36,0.08), 0 4px 24px rgba(0,0,0,0.5)',
     }}>
-      <div style={{
-        position: 'absolute', top: -24, left: '50%', transform: 'translateX(-50%)',
-        width: '200%', height: '55%',
-        background: 'radial-gradient(ellipse, rgba(251,191,36,0.16) 0%, transparent 60%)',
-        pointerEvents: 'none',
-      }} />
-      <div style={{ position: 'absolute', top: 8, left: 10, color: '#fbbf24', fontSize: compact ? 8 : 12, opacity: 0.5 }}>✦</div>
-      <div style={{ position: 'absolute', top: 8, right: 10, color: '#fbbf24', fontSize: compact ? 8 : 12, opacity: 0.5 }}>✦</div>
+      <div className="bv-champion-glow" />
+      <div className="bv-champion-star-tl" style={{ fontSize: compact ? 8 : 12 }}>✦</div>
+      <div className="bv-champion-star-tr" style={{ fontSize: compact ? 8 : 12 }}>✦</div>
 
-      <div style={{ fontSize: compact ? 30 : 52, lineHeight: 1, marginBottom: compact ? 8 : 12, position: 'relative' }}>🏆</div>
+      <div className="bv-champion-trophy" style={{ fontSize: compact ? 30 : 52, marginBottom: compact ? 8 : 12 }}>🏆</div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: compact ? 10 : 16 }}>
-        <div style={{ flex: 1, height: 1, background: 'linear-gradient(to right, transparent, rgba(251,191,36,0.5))' }} />
-        <span style={{ fontSize: compact ? 7 : 9, fontWeight: 800, letterSpacing: '2px', color: '#fbbf24', textTransform: 'uppercase' }}>
-          Campeones
-        </span>
-        <div style={{ flex: 1, height: 1, background: 'linear-gradient(to left, transparent, rgba(251,191,36,0.5))' }} />
+      <div className="bv-champion-divider" style={{ marginBottom: compact ? 10 : 16 }}>
+        <div className="bv-champion-divider-l" />
+        <span className="bv-champion-divider-label" style={{ fontSize: compact ? 7 : 9 }}>Campeones</span>
+        <div className="bv-champion-divider-r" />
       </div>
 
-      <div style={{
-        fontSize: compact ? 13 : 20, fontWeight: 800, color: '#fef3c7', lineHeight: 1.3, marginBottom: 3,
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>
-        {champion.jugador1}
-      </div>
-      <div style={{
-        fontSize: compact ? 11 : 15, fontWeight: 600, color: '#f97316',
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-      }}>
-        {champion.jugador2}
-      </div>
+      <div className="bv-champion-name" style={{ fontSize: compact ? 13 : 20 }}>{champion.jugador1}</div>
+      <div className="bv-champion-sub" style={{ fontSize: compact ? 11 : 15 }}>{champion.jugador2}</div>
 
       {!compact && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 16 }}>
+        <div className="bv-champion-stars">
           <span style={{ color: '#fbbf24', fontSize: 10, opacity: 0.4 }}>★</span>
           <span style={{ color: '#fbbf24', fontSize: 16 }}>★</span>
           <span style={{ color: '#fbbf24', fontSize: 10, opacity: 0.4 }}>★</span>
@@ -167,12 +124,6 @@ function LlaveResultModal({ llave, torneoId, onClose }) {
   const [form, setForm] = useState({ setsA: '', setsB: '', gamesA: '', gamesB: '', wo: false })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-
-  const inp = {
-    background: '#16161e', border: '1px solid #2a2a38', borderRadius: 7,
-    padding: '10px 8px', color: '#f1f1f5', fontSize: 16, fontWeight: 700,
-    width: '100%', outline: 'none', boxSizing: 'border-box', textAlign: 'center',
-  }
 
   async function handleSave() {
     const sA = Number(form.setsA), sB = Number(form.setsB)
@@ -197,53 +148,45 @@ function LlaveResultModal({ llave, torneoId, onClose }) {
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 20 }}>
-      <div style={{ background: '#1a1a22', borderRadius: 14, border: '1px solid #2a2a38', width: '100%', maxWidth: 400, padding: 28 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h3 style={{ color: '#f1f1f5', fontSize: 16, fontWeight: 700, margin: 0 }}>{llave.roundName}</h3>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#9999b0', cursor: 'pointer', fontSize: 22, lineHeight: 1 }}>×</button>
+    <div className="bv-modal-overlay">
+      <div className="bv-modal">
+        <div className="bv-modal-header">
+          <h3 className="bv-modal-title">{llave.roundName}</h3>
+          <button onClick={onClose} className="bv-close-btn">×</button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 10, alignItems: 'center', marginBottom: 14 }}>
+        <div className="bv-teams-grid">
           <div>
-            <div style={{ color: '#9999b0', fontSize: 11, fontWeight: 600, textAlign: 'center', marginBottom: 6 }}>{llave.duplaA?.jugador1}</div>
+            <div className="bv-team-label">{llave.duplaA?.jugador1}</div>
             <input type="number" min="0" max="3" placeholder="0" value={form.setsA}
-              onChange={e => setForm(p => ({ ...p, setsA: e.target.value }))} style={inp}
-              onFocus={e => e.target.style.borderColor = '#f97316'} onBlur={e => e.target.style.borderColor = '#2a2a38'} />
+              onChange={e => setForm(p => ({ ...p, setsA: e.target.value }))} className="bv-inp" />
           </div>
-          <span style={{ color: '#6a6a80', fontSize: 13, fontWeight: 600, paddingTop: 22 }}>vs</span>
+          <span className="bv-vs-label">vs</span>
           <div>
-            <div style={{ color: '#9999b0', fontSize: 11, fontWeight: 600, textAlign: 'center', marginBottom: 6 }}>{llave.duplaB?.jugador1}</div>
+            <div className="bv-team-label">{llave.duplaB?.jugador1}</div>
             <input type="number" min="0" max="3" placeholder="0" value={form.setsB}
-              onChange={e => setForm(p => ({ ...p, setsB: e.target.value }))} style={inp}
-              onFocus={e => e.target.style.borderColor = '#f97316'} onBlur={e => e.target.style.borderColor = '#2a2a38'} />
+              onChange={e => setForm(p => ({ ...p, setsB: e.target.value }))} className="bv-inp" />
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 10, alignItems: 'center', marginBottom: 18 }}>
+        <div className="bv-games-grid">
           <input type="number" min="0" placeholder="Games A" value={form.gamesA}
-            onChange={e => setForm(p => ({ ...p, gamesA: e.target.value }))} style={{ ...inp, fontSize: 13, fontWeight: 400 }}
-            onFocus={e => e.target.style.borderColor = '#f97316'} onBlur={e => e.target.style.borderColor = '#2a2a38'} />
-          <span style={{ color: '#6a6a80', fontSize: 11, textAlign: 'center' }}>games</span>
+            onChange={e => setForm(p => ({ ...p, gamesA: e.target.value }))} className="bv-inp bv-inp-sm" />
+          <span className="bv-games-label">games</span>
           <input type="number" min="0" placeholder="Games B" value={form.gamesB}
-            onChange={e => setForm(p => ({ ...p, gamesB: e.target.value }))} style={{ ...inp, fontSize: 13, fontWeight: 400 }}
-            onFocus={e => e.target.style.borderColor = '#f97316'} onBlur={e => e.target.style.borderColor = '#2a2a38'} />
+            onChange={e => setForm(p => ({ ...p, gamesB: e.target.value }))} className="bv-inp bv-inp-sm" />
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 20 }}>
-          <input type="checkbox" checked={form.wo} onChange={e => setForm(p => ({ ...p, wo: e.target.checked }))}
-            style={{ width: 16, height: 16, cursor: 'pointer', accentColor: '#f97316' }} />
-          <span style={{ color: '#9999b0', fontSize: 13 }}>W.O. (walkover)</span>
+        <label className="bv-wo-label">
+          <input type="checkbox" checked={form.wo} onChange={e => setForm(p => ({ ...p, wo: e.target.checked }))} className="bv-wo-check" />
+          <span className="bv-wo-text">W.O. (walkover)</span>
         </label>
 
-        {error && <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 14 }}>{error}</p>}
+        {error && <p className="bv-error">{error}</p>}
 
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <button onClick={onClose} style={{ background: 'transparent', border: '1px solid #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 13, padding: '8px 18px', cursor: 'pointer' }}>
-            Cancelar
-          </button>
-          <button onClick={handleSave} disabled={saving}
-            style={{ background: '#f97316', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 14, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+        <div className="bv-modal-actions">
+          <button onClick={onClose} className="bv-btn-cancel">Cancelar</button>
+          <button onClick={handleSave} disabled={saving} className="bv-btn-save">
             {saving ? 'Guardando...' : 'Guardar resultado'}
           </button>
         </div>
@@ -276,7 +219,6 @@ export default function BracketView() {
 
   const totalRounds = rounds.length
   const finalRoundName = totalRounds > 0 ? rounds[totalRounds - 1]?.[0]?.roundName : ''
-
   const finalMatch = totalRounds > 0 ? rounds[totalRounds - 1]?.[0] : null
   const isFinalDone = finalMatch && (finalMatch.estado === 'Finalizado' || finalMatch.estado === 'W.O.')
   const champion = isFinalDone
@@ -284,14 +226,12 @@ export default function BracketView() {
     : null
 
   return (
-    <div style={{ maxWidth: 1280, margin: '0 auto', padding: isMobile ? '20px 12px' : '32px 24px' }}>
-
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: isMobile ? 16 : 28, flexWrap: 'wrap', gap: 16 }}>
+    <div className="bv-page" style={{ padding: isMobile ? '20px 12px' : '32px 24px' }}>
+      <div className="bv-header" style={{ marginBottom: isMobile ? 16 : 28 }}>
         <div>
           <h1 style={{ color: '#f1f1f5', fontSize: isMobile ? 22 : 28, fontWeight: 700, margin: '0 0 4px', letterSpacing: '-0.5px' }}>Llave</h1>
           {activeTorneo && (
-            <p style={{ color: '#9999b0', fontSize: 14, margin: 0 }}>
+            <p className="bv-subtitle">
               {activeTorneo.nombre}{finalRoundName ? ` · hasta ${finalRoundName}` : ''}
             </p>
           )}
@@ -299,14 +239,13 @@ export default function BracketView() {
         {rounds.length > 0 && <ShareButton targetRef={shareRef} title="Llave" filename="llave-villapadel" />}
       </div>
 
-      {/* Tournament selector */}
       {torneos.length > 1 && (
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+        <div className="bv-selector">
+          <div className="bv-select-wrap">
             <select
               value={activeTorneo?.id || ''}
               onChange={e => setActiveTorneoId(e.target.value)}
-              style={{ background: '#13131a', border: '1px solid #3a3a50', borderRadius: 8, color: '#f1f1f5', fontSize: 13, fontWeight: 500, padding: '8px 32px 8px 12px', cursor: 'pointer', outline: 'none', appearance: 'none', WebkitAppearance: 'none' }}
+              className="bv-select"
             >
               {torneos.map(t => (
                 <option key={t.id} value={t.id}>
@@ -314,100 +253,94 @@ export default function BracketView() {
                 </option>
               ))}
             </select>
-            <span style={{ position: 'absolute', right: 10, pointerEvents: 'none', color: '#f97316', fontSize: 11 }}>▾</span>
+            <span className="bv-select-arrow">▾</span>
           </div>
         </div>
       )}
 
-      {/* Content */}
       {loading ? (
         <Spinner />
       ) : !activeTorneo ? (
-        <div style={{ textAlign: 'center', padding: 60, background: '#1a1a22', borderRadius: 12, border: '1px dashed #2a2a38', color: '#9999b0' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
-          <p style={{ margin: 0, fontSize: 15, fontWeight: 600, color: '#f1f1f5' }}>No hay torneos</p>
+        <div className="bv-empty">
+          <div className="bv-empty-icon">🏆</div>
+          <p className="bv-empty-title">No hay torneos</p>
         </div>
       ) : activeTorneo.estado !== 'Llave' ? (
-        <div style={{ textAlign: 'center', padding: 60, background: '#1a1a22', borderRadius: 12, border: '1px solid #2a2a38', color: '#9999b0' }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
-          <p style={{ margin: '0 0 6px', fontSize: 15, color: '#f1f1f5', fontWeight: 600 }}>Fase de grupos en curso</p>
-          <p style={{ margin: 0, fontSize: 13 }}>La llave se genera al finalizar la fase de grupos.</p>
+        <div className="bv-info">
+          <div className="bv-info-icon">📋</div>
+          <p className="bv-info-title">Fase de grupos en curso</p>
+          <p className="bv-info-desc">La llave se genera al finalizar la fase de grupos.</p>
         </div>
       ) : rounds.length === 0 ? (
         <Spinner />
       ) : isMobile ? (
-        /* Mobile: vertical round list */
-        <div ref={shareRef} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        <div ref={shareRef} className="bv-mobile-rounds">
           {champion && <ChampionCard champion={champion} />}
-          {rounds.map((roundMatches, roundIdx) => (
-            <div key={roundIdx}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <span style={{
-                  fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px',
-                  color: roundIdx === totalRounds - 1 ? '#f97316' : '#6a6a80',
-                  padding: '3px 10px', borderRadius: 20,
-                  background: roundIdx === totalRounds - 1 ? 'rgba(249,115,22,0.12)' : 'rgba(100,100,160,0.1)',
-                  border: `1px solid ${roundIdx === totalRounds - 1 ? 'rgba(249,115,22,0.3)' : '#2a2a38'}`,
-                }}>
-                  {roundMatches[0]?.roundName || ''}
-                </span>
-                <div style={{ flex: 1, height: 1, background: '#2a2a38' }} />
-                <span style={{ color: '#6666a0', fontSize: 11 }}>{roundMatches.length} partido{roundMatches.length !== 1 ? 's' : ''}</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {roundMatches.map(llave => (
-                  <MatchCard
-                    key={llave.id}
-                    llave={llave}
-                    isAdmin={isAdmin}
-                    onEdit={() => setEditLlave(llave)}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        /* Desktop: horizontal bracket */
-        <div ref={shareRef} style={{ overflowX: 'auto', overflowY: 'visible', paddingBottom: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', minWidth: 'max-content', paddingTop: 8 }}>
-            {rounds.map((roundMatches, roundIdx) => (
-              <div key={roundIdx} style={{ display: 'flex', flexDirection: 'column' }}>
-                <div style={{ paddingBottom: 14, paddingLeft: roundIdx === 0 ? 0 : HALF, width: CARD_W + CONN_W, textAlign: 'center', flexShrink: 0 }}>
+          {rounds.map((roundMatches, roundIdx) => {
+            const isFinal = roundIdx === totalRounds - 1
+            return (
+              <div key={roundIdx}>
+                <div className="bv-mobile-round-header">
                   <span style={{
-                    fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px',
-                    color: roundIdx === totalRounds - 1 ? '#f97316' : '#6a6a80',
-                    borderBottom: roundIdx === totalRounds - 1 ? '1px solid rgba(249,115,22,0.4)' : 'none',
-                    paddingBottom: roundIdx === totalRounds - 1 ? 3 : 0,
+                    fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px',
+                    color: isFinal ? '#f97316' : '#6a6a80',
+                    padding: '3px 10px', borderRadius: 20,
+                    background: isFinal ? 'rgba(249,115,22,0.12)' : 'rgba(100,100,160,0.1)',
+                    border: `1px solid ${isFinal ? 'rgba(249,115,22,0.3)' : '#2a2a38'}`,
                   }}>
                     {roundMatches[0]?.roundName || ''}
                   </span>
+                  <div className="bv-mobile-divider" />
+                  <span className="bv-mobile-count">{roundMatches.length} partido{roundMatches.length !== 1 ? 's' : ''}</span>
                 </div>
-                {roundMatches.map((llave, matchIdx) => (
-                  <BracketSlot
-                    key={llave.id}
-                    llave={llave}
-                    roundIdx={roundIdx}
-                    matchIdx={matchIdx}
-                    totalRounds={totalRounds}
-                    isAdmin={isAdmin}
-                    onEdit={() => setEditLlave(llave)}
-                  />
-                ))}
+                <div className="bv-mobile-matches">
+                  {roundMatches.map(llave => (
+                    <MatchCard key={llave.id} llave={llave} isAdmin={isAdmin} onEdit={() => setEditLlave(llave)} />
+                  ))}
+                </div>
               </div>
-            ))}
+            )
+          })}
+        </div>
+      ) : (
+        <div ref={shareRef} className="bv-bracket-wrap">
+          <div className="bv-bracket-inner">
+            {rounds.map((roundMatches, roundIdx) => {
+              const isFinal = roundIdx === totalRounds - 1
+              return (
+                <div key={roundIdx} className="bv-round-col">
+                  <div className="bv-round-name-wrap" style={{ paddingLeft: roundIdx === 0 ? 0 : HALF, width: CARD_W + CONN_W }}>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.8px',
+                      color: isFinal ? '#f97316' : '#6a6a80',
+                      borderBottom: isFinal ? '1px solid rgba(249,115,22,0.4)' : 'none',
+                      paddingBottom: isFinal ? 3 : 0,
+                    }}>
+                      {roundMatches[0]?.roundName || ''}
+                    </span>
+                  </div>
+                  {roundMatches.map((llave, matchIdx) => (
+                    <BracketSlot
+                      key={llave.id}
+                      llave={llave}
+                      roundIdx={roundIdx}
+                      matchIdx={matchIdx}
+                      totalRounds={totalRounds}
+                      isAdmin={isAdmin}
+                      onEdit={() => setEditLlave(llave)}
+                    />
+                  ))}
+                </div>
+              )
+            })}
 
-            {/* Champion column — inline with bracket, after Final */}
             {champion && (
-              <div style={{ display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
-                <div style={{ paddingBottom: 14 }}>
+              <div className="bv-champion-col">
+                <div className="bv-champion-label-spacer">
                   <span style={{ fontSize: 10, display: 'inline-block', lineHeight: '14px', visibility: 'hidden' }}>.</span>
                 </div>
-                <div style={{
-                  height: rounds[0].length * BASE_H,
-                  display: 'flex', alignItems: 'center',
-                }}>
-                  <div style={{ width: 28, height: 1, background: 'rgba(251,191,36,0.35)', flexShrink: 0 }} />
+                <div className="bv-champion-content" style={{ height: rounds[0].length * BASE_H }}>
+                  <div className="bv-champion-line" />
                   <ChampionCard champion={champion} compact />
                 </div>
               </div>

@@ -1,0 +1,35 @@
+/* ─── LandingView.css ─── */
+
+/* Body container */
+.lv-body { max-width: 960px; margin: 0 auto; }
+
+/* Features section */
+.lv-features-section { margin-bottom: 36px; }
+.lv-features-label { color: #f97316; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 8px; }
+.lv-cta { text-align: center; margin-bottom: 48px; }
+
+/* Match section inline override */
+.lv-match-section {
+  background: #15151e;
+  border: 1px solid rgba(255,255,255,0.05);
+  border-top: 2px solid #f97316;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+}
+
+/* Match section header labels */
+.lv-recent-title { color: #fff; font-size: 14px; font-weight: 700; font-family: var(--font-display); }
+.lv-recent-torneo { color: rgba(255,255,255,.38); font-size: 12px; }
+.lv-match-header-inner { display: flex; align-items: center; gap: 10px; }
+
+/* MatchRow internals */
+.lv-player-cell-r { text-align: right; }
+.lv-player-cell-l { text-align: left; }
+.lv-player-p1 { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lv-player-p2 { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.lv-score-center { text-align: center; min-width: 64px; }
+.lv-score-display { display: flex; align-items: center; gap: 7px; justify-content: center; }
+.lv-score-sep { font-size: 12px; color: rgba(255,255,255,.18); }
+.lv-score-vs { font-size: 11px; color: rgba(255,255,255,.22); font-weight: 600; }
+.lv-score-num { font-size: 22px; font-weight: 800; }
+.lv-live-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; display: inline-block; flex-shrink: 0; }

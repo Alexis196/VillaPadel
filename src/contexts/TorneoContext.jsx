@@ -18,9 +18,8 @@ export function TorneoProvider({ children }) {
 
   useEffect(() => {
     setLoadingTorneos(true)
-    const unsub = onSnapshot(
-      query(collection(db, 'torneos'), orderBy('createdAt', 'desc')),
-      (snap) => {
+    getDocs(query(collection(db, 'torneos'), orderBy('createdAt', 'desc')))
+      .then(snap => {
         const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
         setTorneos(list)
         setActiveTorneoId(prev => {
@@ -29,13 +28,14 @@ export function TorneoProvider({ children }) {
           return active?.id || null
         })
         setLoadingTorneos(false)
-      },
-      () => setLoadingTorneos(false)
-    )
-    return () => unsub()
+      })
+      .catch(() => setLoadingTorneos(false))
   }, [])
 
-  function refreshTorneos() {}
+  function refreshTorneos() {
+    getDocs(query(collection(db, 'torneos'), orderBy('createdAt', 'desc')))
+      .then(snap => setTorneos(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+  }
 
   useEffect(() => {
     if (!activeTorneoId) return

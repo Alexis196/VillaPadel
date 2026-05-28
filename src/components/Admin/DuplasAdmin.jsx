@@ -4,6 +4,8 @@ import { db } from '../../firebase/config'
 import { updateDuplaPago, deleteDupla } from '../../firebase/torneoService'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import Spinner from '../ui/Spinner'
+import AppSelect from '../ui/AppSelect'
+import './DuplasAdmin.css'
 
 function getPago(dupla, num) {
   const key = `pago${num}`
@@ -16,19 +18,19 @@ function PagoBadge({ estado }) {
     ? { bg: 'rgba(34,197,94,0.12)', color: '#22c55e', label: '✓ Pagado' }
     : { bg: 'rgba(239,68,68,0.1)', color: '#ef4444', label: '⏳ Pendiente' }
   return (
-    <span style={{ padding: '2px 8px', borderRadius: 20, background: cfg.bg, color: cfg.color, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
+    <span className="da-badge" style={{ background: cfg.bg, color: cfg.color }}>
       {cfg.label}
     </span>
   )
 }
 
 function MetodoBadge({ metodo }) {
-  if (!metodo) return <span style={{ color: '#44445a', fontSize: 12 }}>—</span>
+  if (!metodo) return <span className="da-badge-muted">—</span>
   const cfg = metodo === 'efectivo'
     ? { bg: 'rgba(34,197,94,0.10)', color: '#22c55e', label: '💵 Efectivo' }
     : { bg: 'rgba(59,130,246,0.12)', color: '#3b82f6', label: '🏦 Transf.' }
   return (
-    <span style={{ padding: '2px 8px', borderRadius: 20, background: cfg.bg, color: cfg.color, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap' }}>
+    <span className="da-badge" style={{ background: cfg.bg, color: cfg.color }}>
       {cfg.label}
     </span>
   )
@@ -55,57 +57,50 @@ function EditRow({ dupla, torneoId, torneoCosto, onSaved }) {
     onSaved({ ...dupla, pago1: form.pago1, pago2: form.pago2 })
   }
 
-  const inp = {
-    background: '#0f0f13', border: '1px solid #2a2a38', borderRadius: 6,
-    padding: '5px 8px', color: '#f1f1f5', fontSize: 12, outline: 'none', boxSizing: 'border-box',
-  }
-
   return (
-    <div style={{ padding: '12px 16px', background: 'rgba(249,115,22,0.04)', borderTop: '1px solid #2a2a38' }}>
+    <div className="da-edit-row">
       {[1, 2].map(num => {
         const pago = form[`pago${num}`]
         const player = num === 1 ? dupla.jugador1 : dupla.jugador2
         return isMobile ? (
           <div key={num} style={{ marginBottom: num === 1 ? 8 : 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <span style={{ color: num === 1 ? '#f97316' : '#9999b0', fontSize: 11, fontWeight: 700, width: 20, flexShrink: 0 }}>J{num}</span>
-              <span style={{ color: '#9999b0', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{player}</span>
+            <div className="da-edit-player-row">
+              <span className="da-edit-j-label" style={{ color: num === 1 ? '#f97316' : '#9999b0' }}>J{num}</span>
+              <span className="da-edit-player-name">{player}</span>
             </div>
-            <div style={{ display: 'flex', gap: 4, paddingLeft: 26 }}>
-              <select value={pago.estado} onChange={e => update(num, 'estado', e.target.value)} style={{ ...inp, cursor: 'pointer', flex: 1 }}>
-                <option value="pendiente">Pendiente</option>
-                <option value="pagado">Pagado</option>
-              </select>
-              <select value={pago.metodo} onChange={e => update(num, 'metodo', e.target.value)} style={{ ...inp, cursor: 'pointer', flex: 1 }} disabled={pago.estado !== 'pagado'}>
-                <option value="">— Método</option>
-                <option value="efectivo">Efectivo</option>
-                <option value="transferencia">Transferencia</option>
-              </select>
-              <input type="number" placeholder="$" value={pago.monto} onChange={e => update(num, 'monto', e.target.value)} style={{ ...inp, width: 64 }} disabled={pago.estado !== 'pagado'} />
+            <div className="da-edit-pago-row-mobile">
+              <div style={{ flex: 1 }}>
+                <AppSelect size="sm" value={pago.estado} onChange={v => update(num, 'estado', v)}
+                  options={[{ value: 'pendiente', label: 'Pendiente' }, { value: 'pagado', label: 'Pagado' }]} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <AppSelect size="sm" value={pago.metodo || ''} onChange={v => update(num, 'metodo', v)}
+                  isDisabled={pago.estado !== 'pagado'}
+                  options={[{ value: '', label: '— Método' }, { value: 'efectivo', label: 'Efectivo' }, { value: 'transferencia', label: 'Transferencia' }]} />
+              </div>
+              <input type="number" placeholder="$" value={pago.monto} onChange={e => update(num, 'monto', e.target.value)}
+                className="da-inp" style={{ width: 64 }} disabled={pago.estado !== 'pagado'} />
             </div>
           </div>
         ) : (
-          <div key={num} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: num === 1 ? 6 : 0 }}>
-            <span style={{ color: num === 1 ? '#f97316' : '#9999b0', fontSize: 11, fontWeight: 700, width: 20, flexShrink: 0 }}>J{num}</span>
-            <span style={{ color: '#9999b0', fontSize: 12, width: 130, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{player}</span>
-            <select value={pago.estado} onChange={e => update(num, 'estado', e.target.value)} style={{ ...inp, cursor: 'pointer', minWidth: 90 }}>
-              <option value="pendiente">Pendiente</option>
-              <option value="pagado">Pagado</option>
-            </select>
-            <select value={pago.metodo} onChange={e => update(num, 'metodo', e.target.value)} style={{ ...inp, cursor: 'pointer', minWidth: 120 }} disabled={pago.estado !== 'pagado'}>
-              <option value="">— Método</option>
-              <option value="efectivo">Efectivo</option>
-              <option value="transferencia">Transferencia</option>
-            </select>
-            <input type="number" placeholder="Monto $" value={pago.monto} onChange={e => update(num, 'monto', e.target.value)} style={{ ...inp, width: 100 }} disabled={pago.estado !== 'pagado'} />
+          <div key={num} className="da-edit-pago-row-desktop" style={{ marginBottom: num === 1 ? 6 : 0 }}>
+            <span className="da-edit-j-label" style={{ color: num === 1 ? '#f97316' : '#9999b0' }}>J{num}</span>
+            <span className="da-edit-player-name-desktop">{player}</span>
+            <div style={{ minWidth: 110 }}>
+              <AppSelect size="sm" value={pago.estado} onChange={v => update(num, 'estado', v)}
+                options={[{ value: 'pendiente', label: 'Pendiente' }, { value: 'pagado', label: 'Pagado' }]} />
+            </div>
+            <div style={{ minWidth: 140 }}>
+              <AppSelect size="sm" value={pago.metodo || ''} onChange={v => update(num, 'metodo', v)}
+                isDisabled={pago.estado !== 'pagado'}
+                options={[{ value: '', label: '— Método' }, { value: 'efectivo', label: 'Efectivo' }, { value: 'transferencia', label: 'Transferencia' }]} />
+            </div>
+            <input type="number" placeholder="Monto $" value={pago.monto} onChange={e => update(num, 'monto', e.target.value)}
+              className="da-inp" style={{ width: 100 }} disabled={pago.estado !== 'pagado'} />
           </div>
         )
       })}
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: 6, padding: '5px 16px', fontSize: 12, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1, marginTop: 8 }}
-      >
+      <button onClick={handleSave} disabled={saving} className="da-save-btn">
         {saving ? '...' : 'Guardar'}
       </button>
     </div>
@@ -114,29 +109,19 @@ function EditRow({ dupla, torneoId, torneoCosto, onSaved }) {
 
 function ConfirmDeleteModal({ dupla, onConfirm, onCancel, deleting }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
-      <div style={{ background: '#1a1a22', border: '1px solid #2a2a38', borderRadius: 12, padding: '24px 28px', width: '100%', maxWidth: 360, boxShadow: '0 16px 48px rgba(0,0,0,0.6)' }}>
-        <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, marginBottom: 14 }}>🗑</div>
-        <h3 style={{ color: '#f1f1f5', fontSize: 16, fontWeight: 700, margin: '0 0 6px' }}>¿Eliminar dupla?</h3>
-        <p style={{ color: '#9999b0', fontSize: 13, margin: '0 0 6px' }}>
-          <span style={{ color: '#f1f1f5', fontWeight: 600 }}>{dupla.jugador1}</span>
-          <span style={{ color: '#6666a0' }}> · </span>
-          <span style={{ color: '#f1f1f5', fontWeight: 600 }}>{dupla.jugador2}</span>
+    <div className="da-modal-overlay">
+      <div className="da-modal">
+        <div className="da-modal-icon">🗑</div>
+        <h3 className="da-modal-title">¿Eliminar dupla?</h3>
+        <p className="da-modal-player">
+          <strong>{dupla.jugador1}</strong>
+          <span className="da-modal-sep"> · </span>
+          <strong>{dupla.jugador2}</strong>
         </p>
-        <p style={{ color: '#6666a0', fontSize: 12, margin: '0 0 20px' }}>Esta acción no se puede deshacer.</p>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={onCancel}
-            disabled={deleting}
-            style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: '1px solid #2a2a38', background: 'transparent', color: '#9999b0', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}
-          >
-            Cancelar
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={deleting}
-            style={{ flex: 1, padding: '9px 0', borderRadius: 8, border: 'none', background: '#ef4444', color: '#fff', fontSize: 13, fontWeight: 700, cursor: deleting ? 'wait' : 'pointer', opacity: deleting ? 0.7 : 1 }}
-          >
+        <p className="da-modal-warn">Esta acción no se puede deshacer.</p>
+        <div className="da-modal-actions">
+          <button onClick={onCancel} disabled={deleting} className="da-modal-cancel">Cancelar</button>
+          <button onClick={onConfirm} disabled={deleting} className="da-modal-confirm">
             {deleting ? 'Eliminando...' : 'Sí, eliminar'}
           </button>
         </div>
@@ -150,7 +135,7 @@ function TorneoDuplas({ torneo, editingId, setEditingId, onSaved }) {
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState(null)
   const [confirmDupla, setConfirmDupla] = useState(null)
-  const [pageSize, setPageSize] = useState(25)
+  const [pageSize, setPageSize] = useState(10)
   const [page, setPage] = useState(1)
   const mountedRef = useRef(true)
   const isCardView = useIsMobile(720)
@@ -175,9 +160,7 @@ function TorneoDuplas({ torneo, editingId, setEditingId, onSaved }) {
     onSaved()
   }
 
-  async function handleDelete(dupla) {
-    setConfirmDupla(dupla)
-  }
+  async function handleDelete(dupla) { setConfirmDupla(dupla) }
 
   async function confirmDelete() {
     const dupla = confirmDupla
@@ -202,7 +185,6 @@ function TorneoDuplas({ torneo, editingId, setEditingId, onSaved }) {
   }, 0)
 
   const totalEsperado = duplas.length * 2 * (torneo.costoPorJugador || 0)
-
   const totalPages = Math.max(1, Math.ceil(duplas.length / pageSize))
   const safePage = Math.min(page, totalPages)
   const paginatedDuplas = duplas.slice((safePage - 1) * pageSize, safePage * pageSize)
@@ -214,156 +196,83 @@ function TorneoDuplas({ torneo, editingId, setEditingId, onSaved }) {
     : { bg: 'rgba(100,116,139,0.12)', color: '#64748b' }
 
   return (
-    <div style={{ marginBottom: 32 }}>
-      {/* Torneo header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <h3 style={{ color: '#f1f1f5', fontSize: 16, fontWeight: 700, margin: 0 }}>{torneo.nombre}</h3>
-        <span style={{ padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: estadoBadge.bg, color: estadoBadge.color }}>
+    <div className="da-torneo-section">
+      <div className="da-torneo-header">
+        <h3 className="da-torneo-name">{torneo.nombre}</h3>
+        <span className="da-torneo-badge" style={{ background: estadoBadge.bg, color: estadoBadge.color }}>
           {torneo.estado}
         </span>
-        {torneo.categoria && (
-          <span style={{ padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: 'rgba(249,115,22,0.10)', color: '#f97316' }}>
-            {torneo.categoria}
-          </span>
-        )}
+        {torneo.categoria && <span className="da-cat-badge">{torneo.categoria}</span>}
       </div>
 
-      {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: isCardView ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: 10, marginBottom: 14 }}>
+      <div className="da-stats-grid" style={{ gridTemplateColumns: isCardView ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)' }}>
         {[
           { label: 'Total duplas', value: loading ? '—' : duplas.length, color: '#f97316' },
           { label: 'Jug. pagados', value: loading ? '—' : jugadoresPagados, color: '#22c55e' },
           { label: 'Jug. pendientes', value: loading ? '—' : jugadoresPendientes, color: '#ef4444' },
           { label: 'Total cobrado', value: loading ? '—' : `$${totalCobrado.toLocaleString()}`, color: '#22c55e' },
         ].map(s => (
-          <div key={s.label} style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 10, padding: '12px 14px' }}>
-            <div style={{ color: s.color, fontSize: 18, fontWeight: 800, lineHeight: 1, marginBottom: 3 }}>{s.value}</div>
-            <div style={{ color: '#9999b0', fontSize: 10 }}>{s.label}</div>
+          <div key={s.label} className="da-stat-card">
+            <div className="da-stat-value" style={{ color: s.color }}>{s.value}</div>
+            <div className="da-stat-label">{s.label}</div>
           </div>
         ))}
       </div>
 
-      {/* Duplas list */}
       {loading ? <Spinner /> : duplas.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 32, background: '#13131a', borderRadius: 12, border: '1px dashed #2a2a38', color: '#9999b0', fontSize: 13 }}>
-          No hay duplas inscriptas en este torneo.
-        </div>
+        <div className="da-empty">No hay duplas inscriptas en este torneo.</div>
       ) : (
         <>
-        {/* Page size selector (desktop only) */}
-        {!isCardView && (
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginBottom: 10, justifyContent: 'flex-end' }}>
-            <span style={{ color: '#6666a0', fontSize: 12 }}>Mostrar</span>
-            {[10, 25, 50].map(n => (
-              <button key={n} onClick={() => { setPageSize(n); setPage(1) }} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', background: pageSize === n ? '#f97316' : 'transparent', color: pageSize === n ? '#fff' : '#9999b0', borderColor: pageSize === n ? '#f97316' : '#2a2a38' }}>{n}</button>
-            ))}
-          </div>
-        )}
+          {!isCardView && (
+            <div className="da-pagesize-group">
+              <span className="da-pagesize-label">Mostrar</span>
+              {[10, 25, 50].map(n => (
+                <button key={n} onClick={() => { setPageSize(n); setPage(1) }}
+                  className={`da-pagesize-btn${pageSize === n ? ' active' : ''}`}>{n}</button>
+              ))}
+            </div>
+          )}
 
-        {isCardView ? (
-          /* Mobile: cards */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {paginatedDuplas.map(d => {
-              const p1 = getPago(d, 1)
-              const p2 = getPago(d, 2)
-              const isEditing = editingId === `${torneo.id}:${d.id}`
-              const fmt = (monto) => monto ? `$${Number(monto).toLocaleString()}` : '—'
-              return (
-                <div key={d.id} style={{ background: '#13131a', borderRadius: 10, border: `1px solid ${isEditing ? '#f97316' : '#2a2a38'}`, overflow: 'hidden' }}>
-                  <div style={{ padding: '10px 14px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{d.jugador1}</div>
-                        <div style={{ color: '#9999b0', fontSize: 12, lineHeight: 1.3 }}>{d.jugador2}</div>
-                      </div>
-                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                        <button
-                          onClick={() => setEditingId(isEditing ? null : `${torneo.id}:${d.id}`)}
-                          style={{ background: isEditing ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 6, color: isEditing ? '#f97316' : '#9999b0', fontSize: 11, padding: '5px 10px', cursor: 'pointer', fontWeight: 500 }}
-                        >
-                          {isEditing ? 'Cerrar' : '✎ Editar'}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(d)}
-                          disabled={deletingId === d.id}
-                          style={{ background: 'rgba(239,68,68,0.08)', border: 'none', borderRadius: 6, color: '#ef4444', fontSize: 11, padding: '5px 10px', cursor: deletingId === d.id ? 'wait' : 'pointer', fontWeight: 500, opacity: deletingId === d.id ? 0.5 : 1 }}
-                        >
-                          {deletingId === d.id ? '...' : '🗑'}
-                        </button>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      {[{ player: d.jugador1, pago: p1 }, { player: d.jugador2, pago: p2 }].map(({ player, pago }, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <span style={{ color: '#6666a0', fontSize: 11, minWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{player}</span>
-                          <PagoBadge estado={pago.estado} />
-                          <MetodoBadge metodo={pago.metodo} />
-                          {pago.monto > 0 && <span style={{ color: '#22c55e', fontSize: 11, fontWeight: 600 }}>{fmt(pago.monto)}</span>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  {isEditing && <EditRow dupla={d} torneoId={torneo.id} torneoCosto={torneo.costoPorJugador} onSaved={handleSaved} />}
-                </div>
-              )
-            })}
-          </div>
-        ) : (
-          /* Desktop: table */
-          <div style={{ background: '#13131a', borderRadius: 12, border: '1px solid #2a2a38', overflow: 'hidden' }}>
-            <div className="scroll-x">
-              {/* Header */}
-              <div style={{ display: 'flex', borderBottom: '1px solid #2a2a38', background: '#0f0f13', height: 36, alignItems: 'center' }}>
-                <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 110px 130px 100px', padding: '0 16px', gap: 10, alignItems: 'center' }}>
-                  {['Jugador', 'Estado', 'Método', 'Monto'].map(h => (
-                    <div key={h} style={{ color: '#6666a0', fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>{h}</div>
-                  ))}
-                </div>
-                <div style={{ width: 90, padding: '0 16px' }} />
-              </div>
-
-              {paginatedDuplas.map((d, idx) => {
+          {isCardView ? (
+            <div className="da-card-list">
+              {paginatedDuplas.map(d => {
                 const p1 = getPago(d, 1)
                 const p2 = getPago(d, 2)
                 const isEditing = editingId === `${torneo.id}:${d.id}`
-                const rowStyle = {
-                  display: 'grid', gridTemplateColumns: '1fr 110px 130px 100px',
-                  padding: '7px 16px', alignItems: 'center', gap: 10,
-                  background: isEditing ? 'rgba(249,115,22,0.04)' : 'transparent',
-                }
                 const fmt = (monto) => monto ? `$${Number(monto).toLocaleString()}` : '—'
-
                 return (
-                  <div key={d.id} style={{ borderBottom: idx < duplas.length - 1 ? '1px solid #262636' : 'none' }}>
-                    <div style={{ display: 'flex', alignItems: 'stretch' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ ...rowStyle, borderBottom: '1px solid #1c1c2c' }}>
-                          <div style={{ color: '#f1f1f5', fontSize: 13 }}>{d.jugador1}</div>
-                          <PagoBadge estado={p1.estado} />
-                          <MetodoBadge metodo={p1.metodo} />
-                          <div style={{ color: p1.monto ? '#f1f1f5' : '#44445a', fontSize: 13, fontWeight: p1.monto ? 600 : 400 }}>{fmt(p1.monto)}</div>
+                  <div key={d.id} className="da-card" style={{ border: `1px solid ${isEditing ? '#f97316' : '#2a2a38'}` }}>
+                    <div className="da-card-body">
+                      <div className="da-card-top">
+                        <div style={{ minWidth: 0 }}>
+                          <div className="da-player-main">{d.jugador1}</div>
+                          <div className="da-player-sub">{d.jugador2}</div>
                         </div>
-                        <div style={rowStyle}>
-                          <div style={{ color: '#9999b0', fontSize: 13 }}>{d.jugador2}</div>
-                          <PagoBadge estado={p2.estado} />
-                          <MetodoBadge metodo={p2.metodo} />
-                          <div style={{ color: p2.monto ? '#f1f1f5' : '#44445a', fontSize: 13, fontWeight: p2.monto ? 600 : 400 }}>{fmt(p2.monto)}</div>
+                        <div className="da-card-actions">
+                          <button
+                            onClick={() => setEditingId(isEditing ? null : `${torneo.id}:${d.id}`)}
+                            className={`da-btn-edit${isEditing ? ' active' : ''}`}
+                          >
+                            {isEditing ? 'Cerrar' : '✎ Editar'}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(d)}
+                            disabled={deletingId === d.id}
+                            className="da-btn-delete"
+                          >
+                            {deletingId === d.id ? '...' : '🗑'}
+                          </button>
                         </div>
                       </div>
-                      <div style={{ width: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '6px 12px', borderLeft: '1px solid #1c1c28' }}>
-                        <button
-                          onClick={() => setEditingId(isEditing ? null : `${torneo.id}:${d.id}`)}
-                          style={{ background: isEditing ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.06)', border: 'none', borderRadius: 6, color: isEditing ? '#f97316' : '#9999b0', fontSize: 11, padding: '4px 8px', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap', width: '100%' }}
-                        >
-                          {isEditing ? 'Cerrar' : '✎ Editar'}
-                        </button>
-                        <button
-                          onClick={() => handleDelete(d)}
-                          disabled={deletingId === d.id}
-                          style={{ background: 'rgba(239,68,68,0.08)', border: 'none', borderRadius: 6, color: '#ef4444', fontSize: 11, padding: '4px 8px', cursor: deletingId === d.id ? 'wait' : 'pointer', fontWeight: 500, whiteSpace: 'nowrap', width: '100%', opacity: deletingId === d.id ? 0.5 : 1 }}
-                        >
-                          {deletingId === d.id ? '...' : '🗑 Eliminar'}
-                        </button>
+                      <div className="da-pago-rows">
+                        {[{ player: d.jugador1, pago: p1 }, { player: d.jugador2, pago: p2 }].map(({ player, pago }, i) => (
+                          <div key={i} className="da-pago-row">
+                            <span className="da-pago-player">{player}</span>
+                            <PagoBadge estado={pago.estado} />
+                            <MetodoBadge metodo={pago.metodo} />
+                            {pago.monto > 0 && <span className="da-pago-amount">{fmt(pago.monto)}</span>}
+                          </div>
+                        ))}
                       </div>
                     </div>
                     {isEditing && <EditRow dupla={d} torneoId={torneo.id} torneoCosto={torneo.costoPorJugador} onSaved={handleSaved} />}
@@ -371,46 +280,111 @@ function TorneoDuplas({ torneo, editingId, setEditingId, onSaved }) {
                 )
               })}
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="da-table-wrap">
+              <div className="scroll-x">
+                <div className="da-table-head">
+                  <div className="da-table-head-inner">
+                    {['Jugador', 'Estado', 'Método', 'Monto'].map(h => (
+                      <div key={h} className="da-th">{h}</div>
+                    ))}
+                  </div>
+                  <div className="da-table-head-spacer" />
+                </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, color: '#9999b0', fontSize: 12 }}>
-            <span>{duplas.length} duplas · página {safePage} de {totalPages}</span>
-            <div style={{ display: 'flex', gap: 4 }}>
-              <button onClick={() => setPage(1)} disabled={safePage === 1} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #2a2a38', background: 'transparent', color: safePage === 1 ? '#44445a' : '#9999b0', cursor: safePage === 1 ? 'default' : 'pointer', fontSize: 12 }}>«</button>
-              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #2a2a38', background: 'transparent', color: safePage === 1 ? '#44445a' : '#9999b0', cursor: safePage === 1 ? 'default' : 'pointer', fontSize: 12 }}>‹</button>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                const start = Math.max(1, Math.min(safePage - 2, totalPages - 4))
-                const pg = start + i
-                return pg <= totalPages ? (
-                  <button key={pg} onClick={() => setPage(pg)} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid', fontSize: 12, cursor: 'pointer', background: pg === safePage ? '#f97316' : 'transparent', color: pg === safePage ? '#fff' : '#9999b0', borderColor: pg === safePage ? '#f97316' : '#2a2a38' }}>{pg}</button>
-                ) : null
-              })}
-              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #2a2a38', background: 'transparent', color: safePage === totalPages ? '#44445a' : '#9999b0', cursor: safePage === totalPages ? 'default' : 'pointer', fontSize: 12 }}>›</button>
-              <button onClick={() => setPage(totalPages)} disabled={safePage === totalPages} style={{ padding: '4px 8px', borderRadius: 6, border: '1px solid #2a2a38', background: 'transparent', color: safePage === totalPages ? '#44445a' : '#9999b0', cursor: safePage === totalPages ? 'default' : 'pointer', fontSize: 12 }}>»</button>
+                {paginatedDuplas.map((d, idx) => {
+                  const p1 = getPago(d, 1)
+                  const p2 = getPago(d, 2)
+                  const isEditing = editingId === `${torneo.id}:${d.id}`
+                  const fmt = (monto) => monto ? `$${Number(monto).toLocaleString()}` : '—'
+                  const editingBg = isEditing ? 'rgba(249,115,22,0.04)' : 'transparent'
+
+                  return (
+                    <div key={d.id} className={idx < paginatedDuplas.length - 1 ? 'da-row-border' : ''}>
+                      <div className="da-row-flex">
+                        <div className="da-row-inner">
+                          <div className="da-row-grid da-row-grid-sub" style={{ background: editingBg }}>
+                            <div className="da-row-player-1">{d.jugador1}</div>
+                            <PagoBadge estado={p1.estado} />
+                            <MetodoBadge metodo={p1.metodo} />
+                            <div className="da-monto-value" style={{ color: p1.monto ? '#f1f1f5' : '#44445a', fontWeight: p1.monto ? 600 : 400 }}>{fmt(p1.monto)}</div>
+                          </div>
+                          <div className="da-row-grid" style={{ background: editingBg }}>
+                            <div className="da-row-player-2">{d.jugador2}</div>
+                            <PagoBadge estado={p2.estado} />
+                            <MetodoBadge metodo={p2.metodo} />
+                            <div className="da-monto-value" style={{ color: p2.monto ? '#f1f1f5' : '#44445a', fontWeight: p2.monto ? 600 : 400 }}>{fmt(p2.monto)}</div>
+                          </div>
+                        </div>
+                        <div className="da-row-actions">
+                          <button
+                            onClick={() => setEditingId(isEditing ? null : `${torneo.id}:${d.id}`)}
+                            className={`da-row-edit-btn${isEditing ? ' active' : ''}`}
+                          >
+                            {isEditing ? 'Cerrar' : '✎ Editar'}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(d)}
+                            disabled={deletingId === d.id}
+                            className="da-row-delete-btn"
+                          >
+                            {deletingId === d.id ? '...' : '🗑 Eliminar'}
+                          </button>
+                        </div>
+                      </div>
+                      {isEditing && <EditRow dupla={d} torneoId={torneo.id} torneoCosto={torneo.costoPorJugador} onSaved={handleSaved} />}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {totalPages > 1 && (
+            <div className="da-pagination">
+              <span>{duplas.length} duplas · página {safePage} de {totalPages}</span>
+              <div className="da-pagination-btns">
+                <button onClick={() => setPage(1)} disabled={safePage === 1} className="da-page-btn">«</button>
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={safePage === 1} className="da-page-btn">‹</button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  const start = Math.max(1, Math.min(safePage - 2, totalPages - 4))
+                  const pg = start + i
+                  return pg <= totalPages ? (
+                    <button key={pg} onClick={() => setPage(pg)}
+                      className={`da-page-num-btn${pg === safePage ? ' active' : ''}`}>{pg}</button>
+                  ) : null
+                })}
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={safePage === totalPages} className="da-page-btn">›</button>
+                <button onClick={() => setPage(totalPages)} disabled={safePage === totalPages} className="da-page-btn">»</button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
-      {/* Financial summary */}
       {!loading && totalEsperado > 0 && (
-        <div style={{ marginTop: 10, padding: '10px 14px', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 10, display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div><span style={{ color: '#9999b0', fontSize: 12 }}>Esperado: </span><span style={{ color: '#f1f1f5', fontWeight: 600 }}>${totalEsperado.toLocaleString()}</span></div>
-          <div><span style={{ color: '#9999b0', fontSize: 12 }}>Cobrado: </span><span style={{ color: '#22c55e', fontWeight: 600 }}>${totalCobrado.toLocaleString()}</span></div>
-          <div><span style={{ color: '#9999b0', fontSize: 12 }}>Diferencia: </span><span style={{ color: totalCobrado < totalEsperado ? '#ef4444' : '#22c55e', fontWeight: 600 }}>${(totalCobrado - totalEsperado).toLocaleString()}</span></div>
-          <div style={{ width: 1, height: 24, background: '#2a2a38', flexShrink: 0 }} />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
-            <span style={{ color: '#9999b0', fontSize: 12 }}>Efectivo: </span>
+        <div className="da-financial-bar">
+          <div className="da-financial-item">
+            <span className="da-financial-label">Esperado: </span>
+            <span style={{ color: '#f1f1f5', fontWeight: 600 }}>${totalEsperado.toLocaleString()}</span>
+          </div>
+          <div className="da-financial-item">
+            <span className="da-financial-label">Cobrado: </span>
+            <span style={{ color: '#22c55e', fontWeight: 600 }}>${totalCobrado.toLocaleString()}</span>
+          </div>
+          <div className="da-financial-item">
+            <span className="da-financial-label">Diferencia: </span>
+            <span style={{ color: totalCobrado < totalEsperado ? '#ef4444' : '#22c55e', fontWeight: 600 }}>${(totalCobrado - totalEsperado).toLocaleString()}</span>
+          </div>
+          <div className="da-financial-divider" />
+          <div className="da-financial-method">
+            <span className="da-method-dot" style={{ background: '#22c55e' }} />
+            <span className="da-financial-label">Efectivo: </span>
             <span style={{ color: '#22c55e', fontWeight: 600, fontSize: 13 }}>${totalEfectivo.toLocaleString()}</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
-            <span style={{ color: '#9999b0', fontSize: 12 }}>Transferencia: </span>
+          <div className="da-financial-method">
+            <span className="da-method-dot" style={{ background: '#3b82f6' }} />
+            <span className="da-financial-label">Transferencia: </span>
             <span style={{ color: '#3b82f6', fontWeight: 600, fontSize: 13 }}>${totalTransferencia.toLocaleString()}</span>
           </div>
         </div>
@@ -450,35 +424,25 @@ export default function DuplasAdmin() {
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
-        <h2 style={{ color: '#f1f1f5', fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Duplas & Pagos</h2>
-        <p style={{ color: '#9999b0', fontSize: 13, margin: 0 }}>Control de inscripción y estado de pago por jugador</p>
+        <h2 className="da-page-title">Duplas & Pagos</h2>
+        <p className="da-page-desc">Control de inscripción y estado de pago por jugador</p>
       </div>
 
       {loading ? <Spinner /> : torneos.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 48, background: '#13131a', borderRadius: 12, border: '1px dashed #2a2a38', color: '#9999b0' }}>
-          No hay torneos creados.
-        </div>
+        <div className="da-empty">No hay torneos creados.</div>
       ) : (
         <>
           <div style={{ marginBottom: 20 }}>
-            <select
+            <AppSelect
               value={selectedId || ''}
-              onChange={e => { setSelectedId(e.target.value); setEditingId(null) }}
-              style={{
-                background: '#13131a', border: '1px solid #3a3a50', borderRadius: 8,
-                color: '#f1f1f5', fontSize: 14, fontWeight: 500,
-                padding: '8px 36px 8px 14px', cursor: 'pointer', outline: 'none',
-                appearance: 'none', minWidth: 240,
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239999b0' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
-                backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center',
-              }}
-            >
-              {torneos.map(t => (
-                <option key={t.id} value={t.id}>
-                  {t.nombre}{t.estado === 'En curso' ? ' · En curso' : t.estado === 'Inscripción' ? ' · Inscripción' : ''}
-                </option>
-              ))}
-            </select>
+              onChange={v => { setSelectedId(v); setEditingId(null) }}
+              options={torneos.map(t => ({
+                value: t.id,
+                label: t.nombre + (t.estado === 'En curso' ? ' · En curso' : t.estado === 'Inscripción' ? ' · Inscripción' : ''),
+              }))}
+              minWidth={240}
+              isSearchable
+            />
           </div>
 
           {torneo && (

@@ -1,0 +1,20 @@
+/* ─── ShareButton.css ─── */
+
+.sb-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: 8px;
+  background: rgba(37,211,102,0.12);
+  border: 1px solid rgba(37,211,102,0.3);
+  color: #25d366; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.sb-btn:hover:not(:disabled) { background: #25d366; color: #fff; }
+.sb-btn:disabled { cursor: wait; background: rgba(37,211,102,0.08); }
+
+.sb-spinner {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid #25d366; border-top-color: transparent;
+  border-radius: 50%; animation: sb-spin 0.6s linear infinite;
+}
+
+@keyframes sb-spin { to { transform: rotate(360deg); } }

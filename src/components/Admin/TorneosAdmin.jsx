@@ -3,7 +3,9 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore'
 import { db } from '../../firebase/config'
 import { createTorneo, updateTorneo, deleteTorneo, addDupla, generateFixture, generateBracket } from '../../firebase/torneoService'
 import Spinner from '../ui/Spinner'
+import AppSelect from '../ui/AppSelect'
 import { useIsMobile } from '../../hooks/useIsMobile'
+import './TorneosAdmin.css'
 
 const CAT_OPTIONS = [
   { id: 'cat-8va', name: '8va Categoría', valor: 8, color: '#64748b' },
@@ -29,16 +31,6 @@ function getTorneoColor(t) {
   if (t.color) return t.color
   const cat = CAT_OPTIONS.find(c => c.id === t.categoriaId)
   return cat?.color || '#f97316'
-}
-
-const inputStyle = {
-  background: '#16161e', border: '1px solid #2a2a38', borderRadius: 8,
-  padding: '10px 14px', color: '#f1f1f5', fontSize: 14, width: '100%',
-  outline: 'none', transition: 'border-color 0.15s', boxSizing: 'border-box',
-}
-const labelStyle = {
-  color: '#9999b0', fontSize: 12, fontWeight: 600, textTransform: 'uppercase',
-  letterSpacing: '0.4px', marginBottom: 6, display: 'block',
 }
 
 function PlayerSearchSelect({ value, selectedId, players, onSelect, onChange, placeholder, style, mode = 'select' }) {
@@ -91,28 +83,23 @@ function PlayerSearchSelect({ value, selectedId, players, onSelect, onChange, pl
         autoComplete="off"
       />
       {open && dropPos && (
-        <div style={{
-          position: 'fixed', top: dropPos.top, left: dropPos.left, width: dropPos.width,
-          zIndex: 9999, background: '#1a1a22', border: '1px solid #3a3a50', borderRadius: 6,
-          maxHeight: 200, overflowY: 'auto', boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
-        }}>
+        <div
+          className="ta-player-dropdown"
+          style={{ top: dropPos.top, left: dropPos.left, width: dropPos.width }}
+        >
           {filtered.length === 0 ? (
-            <div style={{ padding: '8px 12px', color: '#9999b0', fontSize: 12 }}>Sin resultados</div>
+            <div className="ta-player-no-results">Sin resultados</div>
           ) : filtered.map(j => (
             <div
               key={j.id}
               onMouseDown={() => handleSelect(j)}
-              style={{
-                padding: '7px 12px', cursor: 'pointer',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                background: j.id === selectedId ? 'rgba(249,115,22,0.08)' : 'transparent',
-                borderBottom: '1px solid #1c1c28',
-              }}
+              className="ta-player-option"
+              style={{ background: j.id === selectedId ? 'rgba(249,115,22,0.08)' : 'transparent' }}
               onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
               onMouseLeave={e => { e.currentTarget.style.background = j.id === selectedId ? 'rgba(249,115,22,0.08)' : 'transparent' }}
             >
-              <span style={{ color: '#f1f1f5', fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 6 }}>{j.name}</span>
-              <span style={{ color: j.categoryColor || '#9999b0', fontSize: 10, fontWeight: 600, flexShrink: 0 }}>{j.displayCategory || j.categoryName}</span>
+              <span className="ta-player-name">{j.name}</span>
+              <span className="ta-player-cat" style={{ color: j.categoryColor || '#9999b0' }}>{j.displayCategory || j.categoryName}</span>
             </div>
           ))}
         </div>
@@ -205,7 +192,7 @@ function AddDuplasModal({ torneoId, torneoNombre, torneoEstado, torneoTipoTorneo
     onFixtureGenerated()
   }
 
-  const rowInput = {
+  const rowInputStyle = {
     background: '#16161e', border: '1px solid #2a2a38', borderRadius: 6,
     padding: '6px 8px', color: '#f1f1f5', fontSize: 12, outline: 'none',
     width: '100%', boxSizing: 'border-box',
@@ -243,14 +230,12 @@ function AddDuplasModal({ torneoId, torneoNombre, torneoEstado, torneoTipoTorneo
         }
         onChange={!isSuma ? (val => updateDupla(i, num === 1 ? 'jugador1' : 'jugador2', val)) : undefined}
         placeholder={`Jugador ${num}`}
-        style={{ ...rowInput, width: '100%' }}
+        style={{ ...rowInputStyle, width: '100%' }}
         mode={isSuma ? 'select' : 'freeform'}
       />
     )
     const sumaBadge = isSuma && num === 2 && bothSelected && (
-      <span style={{ fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0, color: sumaOk ? '#22c55e' : '#ef4444', background: sumaOk ? 'rgba(34,197,94,0.12)' : 'rgba(239,68,68,0.1)', padding: '2px 6px', borderRadius: 4 }}>
-        Σ{duplaSum}/{sumaMinima}
-      </span>
+      <span className={sumaOk ? 'ta-suma-valid' : 'ta-suma-invalid'}>Σ{duplaSum}/{sumaMinima}</span>
     )
 
     if (isMobile) {
@@ -264,76 +249,74 @@ function AddDuplasModal({ torneoId, torneoNombre, torneoEstado, torneoTipoTorneo
             </div>
           </div>
           <div style={{ display: 'flex', gap: 4, paddingLeft: 28 }}>
-            <select value={pago.estado} onChange={e => updatePago(i, num, 'estado', e.target.value)} style={{ ...rowInput, flex: 1, cursor: 'pointer' }}>
-              <option value="pendiente">Pendiente</option>
-              <option value="pagado">Pagado</option>
-            </select>
-            <select value={pago.metodo} onChange={e => updatePago(i, num, 'metodo', e.target.value)} style={{ ...rowInput, flex: 1, cursor: 'pointer' }} disabled={pago.estado !== 'pagado'}>
-              <option value="">— Método</option>
-              <option value="efectivo">Efectivo</option>
-              <option value="transferencia">Transferencia</option>
-            </select>
-            <input type="number" placeholder="$0" value={pago.monto} onChange={e => updatePago(i, num, 'monto', e.target.value)} style={{ ...rowInput, width: 60 }} disabled={pago.estado !== 'pagado'} />
+            <div style={{ flex: 1 }}>
+              <AppSelect size="sm" value={pago.estado} onChange={v => updatePago(i, num, 'estado', v)}
+                options={[{ value: 'pendiente', label: 'Pendiente' }, { value: 'pagado', label: 'Pagado' }]} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <AppSelect size="sm" value={pago.metodo || ''} onChange={v => updatePago(i, num, 'metodo', v)}
+                isDisabled={pago.estado !== 'pagado'}
+                options={[{ value: '', label: '— Método' }, { value: 'efectivo', label: 'Efectivo' }, { value: 'transferencia', label: 'Transferencia' }]} />
+            </div>
+            <input type="number" placeholder="$0" value={pago.monto} onChange={e => updatePago(i, num, 'monto', e.target.value)} style={{ ...rowInputStyle, width: 60 }} disabled={pago.estado !== 'pagado'} />
           </div>
         </div>
       )
     }
 
     return (
-      <div key={num} style={{ display: 'grid', gridTemplateColumns: '26px 1fr 96px 116px 76px', gap: 6, marginBottom: num === 1 ? 5 : 0, alignItems: 'center' }}>
+      <div key={num} className="ta-pago-row-desktop" style={{ marginBottom: num === 1 ? 5 : 0 }}>
         <span style={{ color: labelColor, fontSize: 11, fontWeight: 700, alignSelf: 'center' }}>J{num}</span>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           {playerSelect}
           {sumaBadge}
         </div>
-        <select value={pago.estado} onChange={e => updatePago(i, num, 'estado', e.target.value)} style={{ ...rowInput, cursor: 'pointer' }}>
+        <select value={pago.estado} onChange={e => updatePago(i, num, 'estado', e.target.value)} className="ta-row-input" style={{ cursor: 'pointer' }}>
           <option value="pendiente">Pendiente</option>
           <option value="pagado">Pagado</option>
         </select>
-        <select value={pago.metodo} onChange={e => updatePago(i, num, 'metodo', e.target.value)} style={{ ...rowInput, cursor: 'pointer' }} disabled={pago.estado !== 'pagado'}>
+        <select value={pago.metodo} onChange={e => updatePago(i, num, 'metodo', e.target.value)} className="ta-row-input" style={{ cursor: 'pointer' }} disabled={pago.estado !== 'pagado'}>
           <option value="">— Método</option>
           <option value="efectivo">Efectivo</option>
           <option value="transferencia">Transferencia</option>
         </select>
-        <input type="number" placeholder="$0" value={pago.monto} onChange={e => updatePago(i, num, 'monto', e.target.value)} style={rowInput} disabled={pago.estado !== 'pagado'} />
+        <input type="number" placeholder="$0" value={pago.monto} onChange={e => updatePago(i, num, 'monto', e.target.value)} className="ta-row-input" disabled={pago.estado !== 'pagado'} />
       </div>
     )
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', zIndex: 1100, padding: isMobile ? 0 : 20 }}>
-      <div style={{ background: '#1a1a22', borderRadius: isMobile ? '14px 14px 0 0' : 14, border: '1px solid #2a2a38', width: '100%', maxWidth: isMobile ? '100%' : 860, maxHeight: isMobile ? '95vh' : '90vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #2a2a38', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div className={`ta-modal-overlay${isMobile ? ' bottom' : ''}`}>
+      <div className={`ta-modal${isMobile ? ' mobile-sheet' : ''}`} style={{ maxWidth: isMobile ? '100%' : 860 }}>
+        <div className="ta-modal-header">
           <div>
-            <h2 style={{ color: '#f1f1f5', fontSize: 18, fontWeight: 700, margin: 0 }}>
+            <h2 className="ta-modal-title">
               {isEnCurso ? 'Agregar Duplas' : 'Cargar Duplas'}
             </h2>
-            <p style={{ color: '#9999b0', fontSize: 13, margin: '3px 0 0' }}>
+            <p className="ta-modal-subtitle">
               {torneoNombre}
-              {isSuma && <span style={{ color: '#8b5cf6', fontWeight: 600, marginLeft: 8 }}>· Suma mínima: {sumaMinima}</span>}
+              {isSuma && <span className="ta-suma-badge">· Suma mínima: {sumaMinima}</span>}
             </p>
           </div>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#9999b0', cursor: 'pointer', fontSize: 22 }}>×</button>
+          <button onClick={onClose} className="ta-modal-close">×</button>
         </div>
 
         {step === 'done' ? (
-          <div style={{ padding: 48, textAlign: 'center' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
-            <h3 style={{ color: '#22c55e', fontSize: 20, fontWeight: 700, margin: '0 0 8px' }}>¡Duplas guardadas!</h3>
-            <p style={{ color: '#9999b0', margin: '0 0 24px', fontSize: 14 }}>
+          <div className="ta-done-step">
+            <div className="ta-done-icon">✅</div>
+            <h3 className="ta-done-title">¡Duplas guardadas!</h3>
+            <p className="ta-done-desc">
               Las duplas fueron guardadas. Podés generar el fixture desde el panel del torneo.
             </p>
-            <button onClick={onClose} style={{ background: '#f97316', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-              Ver Torneos →
-            </button>
+            <button onClick={onClose} className="ta-btn-primary">Ver Torneos →</button>
           </div>
         ) : (
           <>
             {!isMobile && (
-              <div style={{ padding: '10px 24px 4px', background: '#13131a', borderBottom: '1px solid #2a2a38' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '26px 1fr 96px 116px 76px 32px', gap: 6 }}>
+              <div className="ta-dupla-thead">
+                <div className="ta-dupla-thead-row">
                   {['', 'Jugador', 'Estado', 'Método', 'Monto', ''].map((h, idx) => (
-                    <div key={idx} style={{ color: '#6666a0', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', paddingBottom: 6 }}>{h}</div>
+                    <div key={idx} className="ta-dupla-th">{h}</div>
                   ))}
                 </div>
               </div>
@@ -349,39 +332,40 @@ function AddDuplasModal({ torneoId, torneoNombre, torneoEstado, torneoTipoTorneo
                 </p>
               </div>
             ) : (
-              <div style={{ flex: 1, overflowY: 'auto', padding: '12px 24px' }}>
+              <div className="ta-modal-body-scroll">
                 {duplas.map((d, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'stretch' }}>
-                    <div style={{ flex: 1, background: '#13131a', borderRadius: 8, border: '1px solid #2a2a38', padding: '10px 12px' }}>
+                  <div key={i} className="ta-dupla-row">
+                    <div className="ta-dupla-card">
                       {pagoRow(i, 1)}
                       {pagoRow(i, 2)}
                     </div>
                     <button
                       onClick={() => setDuplas(prev => prev.filter((_, idx) => idx !== i))}
-                      style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', color: '#ef4444', borderRadius: 6, cursor: 'pointer', fontSize: 16, width: 32, alignSelf: 'stretch' }}
+                      className="ta-dupla-remove"
                     >×</button>
                   </div>
                 ))}
                 <button
                   onClick={() => setDuplas(prev => [...prev, defaultDupla(costo)])}
-                  style={{ background: 'transparent', border: '1px dashed #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 13, padding: '8px 16px', cursor: 'pointer', width: '100%' }}
+                  className="ta-add-dupla-btn"
                   onMouseEnter={e => { e.currentTarget.style.borderColor = '#f97316'; e.currentTarget.style.color = '#f97316' }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a38'; e.currentTarget.style.color = '#9999b0' }}
                 >+ Agregar dupla</button>
-                {error && <p style={{ color: '#ef4444', fontSize: 13, marginTop: 10 }}>{error}</p>}
+                {error && <p className="ta-error-inline">{error}</p>}
               </div>
             )}
 
-            <div style={{ padding: '16px 24px', borderTop: '1px solid #2a2a38', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className="ta-modal-footer">
               <span style={{ color: '#9999b0', fontSize: 13 }}>
                 {duplas.filter(d => d.jugador1.trim() && d.jugador2.trim()).length} duplas válidas
               </span>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <button onClick={onClose} style={{ background: 'transparent', border: '1px solid #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 13, padding: '8px 18px', cursor: 'pointer' }}>Cancelar</button>
+              <div className="ta-modal-footer-actions">
+                <button onClick={onClose} className="ta-btn-secondary">Cancelar</button>
                 <button
                   onClick={handleSave}
                   disabled={saving || (isSuma && jugadores.length === 0)}
-                  style={{ background: '#f97316', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 600, cursor: (saving || (isSuma && jugadores.length === 0)) ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}
+                  className="ta-btn-primary"
+                  style={{ cursor: (saving || (isSuma && jugadores.length === 0)) ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1 }}
                 >
                   {saving ? 'Guardando...' : '+ Guardar duplas'}
                 </button>
@@ -455,156 +439,127 @@ function NewTorneoModal({ onClose, onCreated }) {
     ? (form.sumaValor ? `Suma ${form.sumaValor}` : 'Suma —')
     : (cat?.name || '—')
 
-  const toggleStyle = (active) => ({
-    flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-    background: active ? '#f97316' : 'transparent',
-    color: active ? '#fff' : '#9999b0',
-    transition: 'all 0.15s',
-  })
-
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }}>
-      <div style={{ background: '#1a1a22', borderRadius: 14, border: '1px solid #2a2a38', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #2a2a38', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <h2 style={{ color: '#f1f1f5', fontSize: 18, fontWeight: 700, margin: 0 }}>Nuevo Torneo</h2>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#9999b0', cursor: 'pointer', fontSize: 22 }}>×</button>
+    <div className="ta-modal-overlay">
+      <div className="ta-modal" style={{ maxWidth: 520 }}>
+        <div className="ta-modal-header">
+          <h2 className="ta-modal-title">Nuevo Torneo</h2>
+          <button onClick={onClose} className="ta-modal-close">×</button>
         </div>
-        <form onSubmit={handleSubmit} style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
-          <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>Nombre del torneo</label>
+        <form onSubmit={handleSubmit} className="ta-modal-body">
+          <div className="ta-field">
+            <label className="ta-label">Nombre del torneo</label>
             <input
               placeholder="ej. Copa Villa Padel — Masculino 3ra"
               value={form.nombre}
               onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))}
-              style={inputStyle}
-              onFocus={e => e.target.style.borderColor = '#f97316'}
-              onBlur={e => e.target.style.borderColor = '#2a2a38'}
+              className="ta-input"
             />
           </div>
 
-          <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>Tipo de torneo</label>
-            <div style={{ display: 'flex', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, padding: 4, gap: 4 }}>
-              <button type="button" style={toggleStyle(form.tipoTorneo === 'categoria')} onClick={() => setForm(p => ({ ...p, tipoTorneo: 'categoria' }))}>
+          <div className="ta-field">
+            <label className="ta-label">Tipo de torneo</label>
+            <div className="ta-toggle-group">
+              <button type="button" className={`ta-toggle${form.tipoTorneo === 'categoria' ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, tipoTorneo: 'categoria' }))}>
                 Por categoría
               </button>
-              <button type="button" style={toggleStyle(form.tipoTorneo === 'suma')} onClick={() => setForm(p => ({ ...p, tipoTorneo: 'suma' }))}>
+              <button type="button" className={`ta-toggle${form.tipoTorneo === 'suma' ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, tipoTorneo: 'suma' }))}>
                 Por suma
               </button>
             </div>
           </div>
 
-          <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>Formato del torneo</label>
-            <div style={{ display: 'flex', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, padding: 4, gap: 4 }}>
-              <button type="button" style={toggleStyle(form.modalidadTorneo === 'tradicional')} onClick={() => setForm(p => ({ ...p, modalidadTorneo: 'tradicional' }))}>Tradicional</button>
-              <button type="button" style={toggleStyle(form.modalidadTorneo === 'americano')} onClick={() => setForm(p => ({ ...p, modalidadTorneo: 'americano' }))}>Americano</button>
+          <div className="ta-field">
+            <label className="ta-label">Formato del torneo</label>
+            <div className="ta-toggle-group">
+              <button type="button" className={`ta-toggle${form.modalidadTorneo === 'tradicional' ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, modalidadTorneo: 'tradicional' }))}>Tradicional</button>
+              <button type="button" className={`ta-toggle${form.modalidadTorneo === 'americano' ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, modalidadTorneo: 'americano' }))}>Americano</button>
             </div>
             {form.modalidadTorneo === 'americano' && (
-              <p style={{ color: '#a78bfa', fontSize: 11, margin: '5px 0 0' }}>
-                Americano: 1 set a 9 games (o diferencia de 2 en paridad).
-              </p>
+              <p className="ta-americano-note">Americano: 1 set a 9 games (o diferencia de 2 en paridad).</p>
             )}
           </div>
 
-          <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>Modalidad</label>
-            <div style={{ display: 'flex', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, padding: 4, gap: 4 }}>
+          <div className="ta-field">
+            <label className="ta-label">Modalidad</label>
+            <div className="ta-toggle-group">
               {[{ v: 'masculino', label: 'Masculino' }, { v: 'femenino', label: 'Femenino' }, { v: 'mixto', label: 'Mixto' }].map(({ v, label }) => (
-                <button key={v} type="button" style={toggleStyle(form.sexo === v)} onClick={() => setForm(p => ({ ...p, sexo: v }))}>{label}</button>
+                <button key={v} type="button" className={`ta-toggle${form.sexo === v ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, sexo: v }))}>{label}</button>
               ))}
             </div>
           </div>
 
           {form.tipoTorneo === 'categoria' ? (
-            <div style={{ marginBottom: 18 }}>
-              <label style={labelStyle}>Categoría</label>
-              <select
+            <div className="ta-field">
+              <label className="ta-label">Categoría</label>
+              <AppSelect
                 value={form.categoriaId}
-                onChange={e => setForm(p => ({ ...p, categoriaId: e.target.value }))}
-                style={{ ...inputStyle, cursor: 'pointer' }}
-              >
-                {CAT_OPTIONS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+                onChange={v => setForm(p => ({ ...p, categoriaId: v }))}
+                options={CAT_OPTIONS.map(c => ({ value: c.id, label: c.name }))}
+              />
             </div>
           ) : (
-            <div style={{ marginBottom: 18 }}>
-              <label style={labelStyle}>Valor de suma</label>
+            <div className="ta-field">
+              <label className="ta-label">Valor de suma</label>
               <input
                 type="number"
                 placeholder="ej. 15, 14, 13..."
                 value={form.sumaValor}
                 onChange={e => setForm(p => ({ ...p, sumaValor: e.target.value }))}
-                style={inputStyle}
+                className="ta-input"
                 min="1"
-                onFocus={e => e.target.style.borderColor = '#f97316'}
-                onBlur={e => e.target.style.borderColor = '#2a2a38'}
               />
-              <p style={{ color: '#9999b0', fontSize: 11, margin: '4px 0 0' }}>
-                La suma de los niveles de ambos jugadores de la dupla.
-              </p>
+              <p className="ta-suma-note">La suma de los niveles de ambos jugadores de la dupla.</p>
             </div>
           )}
 
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 18 }}>
             <div>
-              <label style={labelStyle}>Fecha de inicio</label>
-              <input
-                type="date"
-                value={form.fechaInicio}
-                onChange={e => setForm(p => ({ ...p, fechaInicio: e.target.value }))}
-                style={inputStyle}
-                onFocus={e => e.target.style.borderColor = '#f97316'}
-                onBlur={e => e.target.style.borderColor = '#2a2a38'}
-              />
+              <label className="ta-label">Fecha de inicio</label>
+              <input type="date" value={form.fechaInicio} onChange={e => setForm(p => ({ ...p, fechaInicio: e.target.value }))} className="ta-input" />
             </div>
             <div>
-              <label style={labelStyle}>Costo por jugador ($)</label>
-              <input
-                type="number"
-                placeholder="ej. 18000"
-                value={form.costoPorJugador}
-                onChange={e => setForm(p => ({ ...p, costoPorJugador: e.target.value }))}
-                style={inputStyle}
-                onFocus={e => e.target.style.borderColor = '#f97316'}
-                onBlur={e => e.target.style.borderColor = '#2a2a38'}
-              />
+              <label className="ta-label">Costo por jugador ($)</label>
+              <input type="number" placeholder="ej. 18000" value={form.costoPorJugador} onChange={e => setForm(p => ({ ...p, costoPorJugador: e.target.value }))} className="ta-input" />
             </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 18 }}>
             <div>
-              <label style={labelStyle}>Parejas por zona</label>
-              <div style={{ display: 'flex', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, padding: 4, gap: 4 }}>
+              <label className="ta-label">Parejas por zona</label>
+              <div className="ta-toggle-group">
                 {[3, 4].map(n => (
-                  <button key={n} type="button" style={toggleStyle(form.tamanoZona === n)} onClick={() => setForm(p => ({ ...p, tamanoZona: n }))}>{n} parejas</button>
+                  <button key={n} type="button" className={`ta-toggle${form.tamanoZona === n ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, tamanoZona: n }))}>{n} parejas</button>
                 ))}
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Clasifican por zona</label>
-              <div style={{ display: 'flex', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, padding: 4, gap: 4 }}>
+              <label className="ta-label">Clasifican por zona</label>
+              <div className="ta-toggle-group">
                 {[1, 2].map(n => (
-                  <button key={n} type="button" style={toggleStyle(form.clasificadosPorZona === n)} onClick={() => setForm(p => ({ ...p, clasificadosPorZona: n }))}>{n === 1 ? '1 pareja' : '2 parejas'}</button>
+                  <button key={n} type="button" className={`ta-toggle${form.clasificadosPorZona === n ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, clasificadosPorZona: n }))}>{n === 1 ? '1 pareja' : '2 parejas'}</button>
                 ))}
               </div>
             </div>
           </div>
 
-          <div style={{ background: `${previewColor}10`, border: `1px solid ${previewColor}30`, borderRadius: 8, padding: '10px 14px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: previewColor, flexShrink: 0, display: 'inline-block' }} />
-            <span style={{ color: previewColor, fontSize: 13, fontWeight: 600 }}>{previewName}</span>
+          <div
+            className="ta-preview-bar"
+            style={{ background: `${previewColor}10`, border: `1px solid ${previewColor}30` }}
+          >
+            <span className="ta-preview-dot" style={{ background: previewColor }} />
+            <span className="ta-preview-text" style={{ color: previewColor }}>{previewName}</span>
             {form.fechaInicio && (
-              <span style={{ color: '#9999b0', fontSize: 12, marginLeft: 'auto' }}>
+              <span className="ta-preview-date">
                 {form.fechaInicio > new Date().toISOString().split('T')[0] ? '📋 Inscripción' : '▶️ En curso'}
               </span>
             )}
           </div>
 
-          {error && <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 12 }}>{error}</p>}
+          {error && <p className="ta-error">{error}</p>}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <button type="button" onClick={onClose} style={{ background: 'transparent', border: '1px solid #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 13, padding: '9px 18px', cursor: 'pointer' }}>Cancelar</button>
-            <button type="submit" disabled={saving} style={{ background: '#f97316', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 14, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button type="button" onClick={onClose} className="ta-btn-secondary">Cancelar</button>
+            <button type="submit" disabled={saving} className="ta-btn-primary" style={{ cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Creando...' : 'Crear torneo →'}
             </button>
           </div>
@@ -666,108 +621,103 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
 
   const previewColor = form.tipoTorneo === 'suma' ? '#8b5cf6' : (CAT_OPTIONS.find(c => c.id === form.categoriaId)?.color || '#f97316')
   const previewName = form.tipoTorneo === 'suma' ? (form.sumaValor ? `Suma ${form.sumaValor}` : 'Suma —') : (CAT_OPTIONS.find(c => c.id === form.categoriaId)?.name || '—')
-  const toggleStyle = (active) => ({
-    flex: 1, padding: '8px 0', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-    background: active ? '#f97316' : 'transparent', color: active ? '#fff' : '#9999b0', transition: 'all 0.15s',
-  })
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: 20 }}>
-      <div style={{ background: '#1a1a22', borderRadius: 14, border: '1px solid #2a2a38', width: '100%', maxWidth: 520, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid #2a2a38', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-          <h2 style={{ color: '#f1f1f5', fontSize: 18, fontWeight: 700, margin: 0 }}>Editar Torneo</h2>
-          <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: '#9999b0', cursor: 'pointer', fontSize: 22 }}>×</button>
+    <div className="ta-modal-overlay">
+      <div className="ta-modal" style={{ maxWidth: 520 }}>
+        <div className="ta-modal-header">
+          <h2 className="ta-modal-title">Editar Torneo</h2>
+          <button onClick={onClose} className="ta-modal-close">×</button>
         </div>
-        <form onSubmit={handleSubmit} style={{ padding: 24, overflowY: 'auto', flex: 1 }}>
-          <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>Nombre del torneo</label>
-            <input value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} style={inputStyle}
-              onFocus={e => e.target.style.borderColor = '#f97316'} onBlur={e => e.target.style.borderColor = '#2a2a38'} />
+        <form onSubmit={handleSubmit} className="ta-modal-body">
+          <div className="ta-field">
+            <label className="ta-label">Nombre del torneo</label>
+            <input value={form.nombre} onChange={e => setForm(p => ({ ...p, nombre: e.target.value }))} className="ta-input" />
           </div>
-          <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>Tipo de torneo</label>
-            <div style={{ display: 'flex', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, padding: 4, gap: 4 }}>
-              <button type="button" style={toggleStyle(form.tipoTorneo === 'categoria')} onClick={() => setForm(p => ({ ...p, tipoTorneo: 'categoria' }))}>Por categoría</button>
-              <button type="button" style={toggleStyle(form.tipoTorneo === 'suma')} onClick={() => setForm(p => ({ ...p, tipoTorneo: 'suma' }))}>Por suma</button>
+          <div className="ta-field">
+            <label className="ta-label">Tipo de torneo</label>
+            <div className="ta-toggle-group">
+              <button type="button" className={`ta-toggle${form.tipoTorneo === 'categoria' ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, tipoTorneo: 'categoria' }))}>Por categoría</button>
+              <button type="button" className={`ta-toggle${form.tipoTorneo === 'suma' ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, tipoTorneo: 'suma' }))}>Por suma</button>
             </div>
           </div>
-          <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>Formato del torneo</label>
-            <div style={{ display: 'flex', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, padding: 4, gap: 4 }}>
-              <button type="button" style={toggleStyle(form.modalidadTorneo === 'tradicional')} onClick={() => setForm(p => ({ ...p, modalidadTorneo: 'tradicional' }))}>Tradicional</button>
-              <button type="button" style={toggleStyle(form.modalidadTorneo === 'americano')} onClick={() => setForm(p => ({ ...p, modalidadTorneo: 'americano' }))}>Americano</button>
+          <div className="ta-field">
+            <label className="ta-label">Formato del torneo</label>
+            <div className="ta-toggle-group">
+              <button type="button" className={`ta-toggle${form.modalidadTorneo === 'tradicional' ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, modalidadTorneo: 'tradicional' }))}>Tradicional</button>
+              <button type="button" className={`ta-toggle${form.modalidadTorneo === 'americano' ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, modalidadTorneo: 'americano' }))}>Americano</button>
             </div>
             {form.modalidadTorneo === 'americano' && (
-              <p style={{ color: '#a78bfa', fontSize: 11, margin: '5px 0 0' }}>
-                Americano: 1 set a 9 games (o diferencia de 2 en paridad).
-              </p>
+              <p className="ta-americano-note">Americano: 1 set a 9 games (o diferencia de 2 en paridad).</p>
             )}
           </div>
-          <div style={{ marginBottom: 18 }}>
-            <label style={labelStyle}>Modalidad</label>
-            <div style={{ display: 'flex', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, padding: 4, gap: 4 }}>
+          <div className="ta-field">
+            <label className="ta-label">Modalidad</label>
+            <div className="ta-toggle-group">
               {[{ v: 'masculino', label: 'Masculino' }, { v: 'femenino', label: 'Femenino' }, { v: 'mixto', label: 'Mixto' }].map(({ v, label }) => (
-                <button key={v} type="button" style={toggleStyle(form.sexo === v)} onClick={() => setForm(p => ({ ...p, sexo: v }))}>{label}</button>
+                <button key={v} type="button" className={`ta-toggle${form.sexo === v ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, sexo: v }))}>{label}</button>
               ))}
             </div>
           </div>
           {form.tipoTorneo === 'categoria' ? (
-            <div style={{ marginBottom: 18 }}>
-              <label style={labelStyle}>Categoría</label>
-              <select value={form.categoriaId} onChange={e => setForm(p => ({ ...p, categoriaId: e.target.value }))} style={{ ...inputStyle, cursor: 'pointer' }}>
-                {CAT_OPTIONS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+            <div className="ta-field">
+              <label className="ta-label">Categoría</label>
+              <AppSelect
+                value={form.categoriaId}
+                onChange={v => setForm(p => ({ ...p, categoriaId: v }))}
+                options={CAT_OPTIONS.map(c => ({ value: c.id, label: c.name }))}
+              />
             </div>
           ) : (
-            <div style={{ marginBottom: 18 }}>
-              <label style={labelStyle}>Valor de suma</label>
-              <input type="number" placeholder="ej. 15, 14, 13..." value={form.sumaValor} onChange={e => setForm(p => ({ ...p, sumaValor: e.target.value }))} style={inputStyle} min="1"
-                onFocus={e => e.target.style.borderColor = '#f97316'} onBlur={e => e.target.style.borderColor = '#2a2a38'} />
+            <div className="ta-field">
+              <label className="ta-label">Valor de suma</label>
+              <input type="number" placeholder="ej. 15, 14, 13..." value={form.sumaValor} onChange={e => setForm(p => ({ ...p, sumaValor: e.target.value }))} className="ta-input" min="1" />
             </div>
           )}
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 18 }}>
             <div>
-              <label style={labelStyle}>Fecha de inicio</label>
-              <input type="date" value={form.fechaInicio} onChange={e => setForm(p => ({ ...p, fechaInicio: e.target.value }))} style={inputStyle}
-                onFocus={e => e.target.style.borderColor = '#f97316'} onBlur={e => e.target.style.borderColor = '#2a2a38'} />
+              <label className="ta-label">Fecha de inicio</label>
+              <input type="date" value={form.fechaInicio} onChange={e => setForm(p => ({ ...p, fechaInicio: e.target.value }))} className="ta-input" />
             </div>
             <div>
-              <label style={labelStyle}>Costo por jugador ($)</label>
-              <input type="number" placeholder="ej. 18000" value={form.costoPorJugador} onChange={e => setForm(p => ({ ...p, costoPorJugador: e.target.value }))} style={inputStyle}
-                onFocus={e => e.target.style.borderColor = '#f97316'} onBlur={e => e.target.style.borderColor = '#2a2a38'} />
+              <label className="ta-label">Costo por jugador ($)</label>
+              <input type="number" placeholder="ej. 18000" value={form.costoPorJugador} onChange={e => setForm(p => ({ ...p, costoPorJugador: e.target.value }))} className="ta-input" />
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 18 }}>
             <div>
-              <label style={labelStyle}>Parejas por zona</label>
-              <div style={{ display: 'flex', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, padding: 4, gap: 4 }}>
+              <label className="ta-label">Parejas por zona</label>
+              <div className="ta-toggle-group">
                 {[3, 4].map(n => (
-                  <button key={n} type="button" style={toggleStyle(form.tamanoZona === n)} onClick={() => setForm(p => ({ ...p, tamanoZona: n }))}>{n} parejas</button>
+                  <button key={n} type="button" className={`ta-toggle${form.tamanoZona === n ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, tamanoZona: n }))}>{n} parejas</button>
                 ))}
               </div>
             </div>
             <div>
-              <label style={labelStyle}>Clasifican por zona</label>
-              <div style={{ display: 'flex', background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, padding: 4, gap: 4 }}>
+              <label className="ta-label">Clasifican por zona</label>
+              <div className="ta-toggle-group">
                 {[1, 2].map(n => (
-                  <button key={n} type="button" style={toggleStyle(form.clasificadosPorZona === n)} onClick={() => setForm(p => ({ ...p, clasificadosPorZona: n }))}>{n === 1 ? '1 pareja' : '2 parejas'}</button>
+                  <button key={n} type="button" className={`ta-toggle${form.clasificadosPorZona === n ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, clasificadosPorZona: n }))}>{n === 1 ? '1 pareja' : '2 parejas'}</button>
                 ))}
               </div>
             </div>
           </div>
-          <div style={{ background: `${previewColor}10`, border: `1px solid ${previewColor}30`, borderRadius: 8, padding: '10px 14px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', background: previewColor, flexShrink: 0, display: 'inline-block' }} />
-            <span style={{ color: previewColor, fontSize: 13, fontWeight: 600 }}>{previewName}</span>
+          <div
+            className="ta-preview-bar"
+            style={{ background: `${previewColor}10`, border: `1px solid ${previewColor}30` }}
+          >
+            <span className="ta-preview-dot" style={{ background: previewColor }} />
+            <span className="ta-preview-text" style={{ color: previewColor }}>{previewName}</span>
             {form.fechaInicio && (
-              <span style={{ color: '#9999b0', fontSize: 12, marginLeft: 'auto' }}>
+              <span className="ta-preview-date">
                 {form.fechaInicio > new Date().toISOString().split('T')[0] ? '📋 Inscripción' : '▶️ En curso'}
               </span>
             )}
           </div>
-          {error && <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 12 }}>{error}</p>}
+          {error && <p className="ta-error">{error}</p>}
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-            <button type="button" onClick={onClose} style={{ background: 'transparent', border: '1px solid #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 13, padding: '9px 18px', cursor: 'pointer' }}>Cancelar</button>
-            <button type="submit" disabled={saving} style={{ background: '#f97316', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 14, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+            <button type="button" onClick={onClose} className="ta-btn-secondary">Cancelar</button>
+            <button type="submit" disabled={saving} className="ta-btn-primary" style={{ cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
               {saving ? 'Guardando...' : 'Guardar cambios'}
             </button>
           </div>
@@ -855,21 +805,26 @@ export default function TorneosAdmin() {
             <div>
               <button
                 onClick={() => setSelected(null)}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'transparent', border: 'none', color: '#9999b0', cursor: 'pointer', fontSize: 13, padding: '4px 0', marginBottom: 20 }}
+                className="ta-back-btn"
                 onMouseEnter={e => e.currentTarget.style.color = '#f1f1f5'}
                 onMouseLeave={e => e.currentTarget.style.color = '#9999b0'}
               >
                 ← Torneos
               </button>
 
-              <div style={{ marginBottom: 24 }}>
+              <div className="ta-detail-header">
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ height: 3, width: 36, background: col, borderRadius: 2, marginBottom: 10 }} />
-                    <h2 style={{ color: '#f1f1f5', fontSize: 22, fontWeight: 700, margin: '0 0 8px' }}>{t.nombre}</h2>
+                    <div className="ta-detail-accent" style={{ background: col }} />
+                    <h2 className="ta-detail-title">{t.nombre}</h2>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 20, background: st.bg, color: st.color, border: `1px solid ${st.border}` }}>{t.estado}</span>
+                  <div className="ta-detail-actions">
+                    <span
+                      className="ta-status-badge"
+                      style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}` }}
+                    >
+                      {t.estado}
+                    </span>
                     <button
                       onClick={() => setEditModal(t)}
                       style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 12, padding: '6px 14px', cursor: 'pointer', transition: 'all 0.15s' }}
@@ -878,69 +833,70 @@ export default function TorneosAdmin() {
                     >✎ Editar</button>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <div className="ta-detail-meta">
                   <span style={{ padding: '3px 10px', borderRadius: 20, background: `${col}18`, border: `1px solid ${col}40`, color: col, fontSize: 12, fontWeight: 600 }}>{t.categoriaName}</span>
-                  <span style={{ color: '#9999b0', fontSize: 12 }}>{sexoLabel}</span>
-                  {t.modalidadTorneo === 'americano' && (
-                    <span style={{ padding: '3px 10px', borderRadius: 20, background: 'rgba(167,139,250,0.15)', border: '1px solid rgba(167,139,250,0.35)', color: '#a78bfa', fontSize: 12, fontWeight: 600 }}>Americano</span>
-                  )}
-                  {t.fechaInicio && <span style={{ color: '#9999b0', fontSize: 12 }}>📅 {t.fechaInicio}</span>}
-                  {t.costoPorJugador > 0 && <span style={{ color: '#9999b0', fontSize: 12 }}>💰 ${Number(t.costoPorJugador).toLocaleString()} / jugador</span>}
+                  <span className="ta-meta-text">{sexoLabel}</span>
+                  {t.modalidadTorneo === 'americano' && <span className="ta-americano-badge">Americano</span>}
+                  {t.fechaInicio && <span className="ta-meta-text">📅 {t.fechaInicio}</span>}
+                  {t.costoPorJugador > 0 && <span className="ta-meta-text">💰 ${Number(t.costoPorJugador).toLocaleString()} / jugador</span>}
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10, marginBottom: 28 }}>
+              <div className="ta-stats-grid">
                 {[
                   { label: 'Zonas', value: t.zonas ?? '—' },
                   { label: 'Parejas / zona', value: t.tamanoZona || 4 },
                   { label: 'Clasifican', value: t.clasificadosPorZona || 1 },
                   { label: 'Costo / jugador', value: t.costoPorJugador ? `$${Number(t.costoPorJugador).toLocaleString()}` : '—' },
                 ].map(s => (
-                  <div key={s.label} style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 10, padding: '14px 16px' }}>
-                    <div style={{ color: '#f1f1f5', fontSize: 22, fontWeight: 800, lineHeight: 1, marginBottom: 4 }}>{s.value}</div>
-                    <div style={{ color: '#9999b0', fontSize: 11 }}>{s.label}</div>
+                  <div key={s.label} className="ta-stat-card">
+                    <div className="ta-stat-value">{s.value}</div>
+                    <div className="ta-stat-label">{s.label}</div>
                   </div>
                 ))}
               </div>
 
-              <div style={{ color: '#9999b0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 12 }}>Acciones</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, marginBottom: 32 }}>
+              <div className="ta-section-heading">Acciones</div>
+              <div className="ta-actions-grid">
                 <button
                   onClick={() => setDuplasModal({ id: t.id, nombre: t.nombre, estado: t.estado, tipoTorneo: t.tipoTorneo, categoriaValor: t.categoriaValor, sexo: t.sexo, costoPorJugador: t.costoPorJugador })}
-                  style={{ background: '#13131a', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 12, padding: '18px 20px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
+                  className="ta-action-card"
+                  style={{ border: '1px solid rgba(249,115,22,0.3)' }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'rgba(249,115,22,0.08)'; e.currentTarget.style.borderColor = '#f97316' }}
                   onMouseLeave={e => { e.currentTarget.style.background = '#13131a'; e.currentTarget.style.borderColor = 'rgba(249,115,22,0.3)' }}
                 >
-                  <div style={{ fontSize: 22, marginBottom: 8 }}>👥</div>
-                  <div style={{ color: '#f97316', fontSize: 14, fontWeight: 700, marginBottom: 3 }}>Agregar duplas</div>
-                  <div style={{ color: '#9999b0', fontSize: 12 }}>Inscribir parejas al torneo</div>
+                  <div className="ta-action-card-icon">👥</div>
+                  <div className="ta-action-card-title" style={{ color: '#f97316' }}>Agregar duplas</div>
+                  <div className="ta-action-card-desc">Inscribir parejas al torneo</div>
                 </button>
                 <button
                   onClick={() => setFixtureConfirm(t)}
-                  style={{ background: '#13131a', border: '1px solid rgba(139,92,246,0.3)', borderRadius: 12, padding: '18px 20px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
+                  className="ta-action-card"
+                  style={{ border: '1px solid rgba(139,92,246,0.3)' }}
                   onMouseEnter={e => { e.currentTarget.style.background = 'rgba(139,92,246,0.08)'; e.currentTarget.style.borderColor = '#8b5cf6' }}
                   onMouseLeave={e => { e.currentTarget.style.background = '#13131a'; e.currentTarget.style.borderColor = 'rgba(139,92,246,0.3)' }}
                 >
-                  <div style={{ fontSize: 22, marginBottom: 8 }}>⚡</div>
-                  <div style={{ color: '#8b5cf6', fontSize: 14, fontWeight: 700, marginBottom: 3 }}>Generar fixture</div>
-                  <div style={{ color: '#9999b0', fontSize: 12 }}>Crear zonas y cruces automáticamente</div>
+                  <div className="ta-action-card-icon">⚡</div>
+                  <div className="ta-action-card-title" style={{ color: '#8b5cf6' }}>Generar fixture</div>
+                  <div className="ta-action-card-desc">Crear zonas y cruces automáticamente</div>
                 </button>
                 {t.estado === 'Llave' && (
                   <button
                     onClick={() => setLlaveConfirm(t)}
-                    style={{ background: '#13131a', border: '1px solid rgba(16,185,129,0.3)', borderRadius: 12, padding: '18px 20px', cursor: 'pointer', textAlign: 'left', transition: 'all 0.15s' }}
+                    className="ta-action-card"
+                    style={{ border: '1px solid rgba(16,185,129,0.3)' }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.08)'; e.currentTarget.style.borderColor = '#10b981' }}
                     onMouseLeave={e => { e.currentTarget.style.background = '#13131a'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.3)' }}
                   >
-                    <div style={{ fontSize: 22, marginBottom: 8 }}>🏅</div>
-                    <div style={{ color: '#10b981', fontSize: 14, fontWeight: 700, marginBottom: 3 }}>Regenerar llave</div>
-                    <div style={{ color: '#9999b0', fontSize: 12 }}>Reconstruir bracket de eliminación</div>
+                    <div className="ta-action-card-icon">🏅</div>
+                    <div className="ta-action-card-title" style={{ color: '#10b981' }}>Regenerar llave</div>
+                    <div className="ta-action-card-desc">Reconstruir bracket de eliminación</div>
                   </button>
                 )}
               </div>
 
-              <div style={{ borderTop: '1px solid #2a2a38', paddingTop: 20 }}>
-                <div style={{ color: '#9999b0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.4px', marginBottom: 12 }}>Zona de peligro</div>
+              <div className="ta-danger-zone">
+                <div className="ta-section-heading">Zona de peligro</div>
                 <button
                   onClick={() => setConfirmDelete(t)}
                   style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 10, padding: '11px 20px', cursor: 'pointer', color: '#ef4444', fontSize: 13, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 8, transition: 'all 0.15s' }}
@@ -956,41 +912,36 @@ export default function TorneosAdmin() {
       ) : (
         /* ── LIST VIEW ── */
         <div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
+          <div className="ta-list-header">
             <div>
-              <h2 style={{ color: '#f1f1f5', fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>Torneos</h2>
-              <p style={{ color: '#9999b0', fontSize: 13, margin: 0 }}>
+              <h2 className="ta-list-title">Torneos</h2>
+              <p className="ta-list-desc">
                 {torneos.length} torneo{torneos.length !== 1 ? 's' : ''} · {enCurso} en curso · {inscripcion} en inscripción
               </p>
             </div>
-            <button
-              onClick={() => setShowNew(true)}
-              style={{ background: '#f97316', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer', boxShadow: '0 0 16px rgba(249,115,22,0.3)' }}
-            >
-              + Nuevo Torneo
-            </button>
+            <button onClick={() => setShowNew(true)} className="ta-new-btn">+ Nuevo Torneo</button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
+          <div className="ta-summary-stats">
             {[
               { label: 'Total', value: torneos.length },
               { label: 'En curso', value: enCurso },
               { label: 'Inscripción', value: inscripcion },
             ].map(s => (
-              <div key={s.label} style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 10, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ color: '#f1f1f5', fontSize: 28, fontWeight: 800 }}>{s.value}</div>
-                <div style={{ color: '#9999b0', fontSize: 12 }}>{s.label}</div>
+              <div key={s.label} className="ta-summary-card">
+                <div className="ta-summary-value">{s.value}</div>
+                <div className="ta-summary-label">{s.label}</div>
               </div>
             ))}
           </div>
 
           {torneos.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 48, background: '#13131a', borderRadius: 12, border: '1px dashed #2a2a38', color: '#9999b0' }}>
-              <div style={{ fontSize: 36, marginBottom: 10 }}>🏆</div>
-              <p style={{ margin: 0, fontSize: 14 }}>Creá el primer torneo con "+ Nuevo Torneo"</p>
+            <div className="ta-empty">
+              <div className="ta-empty-icon">🏆</div>
+              <p className="ta-empty-text">Creá el primer torneo con "+ Nuevo Torneo"</p>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+            <div className="ta-cards-grid">
               {torneos.map(t => {
                 const col = getTorneoColor(t)
                 const st = STATUS_STYLE[t.estado] || STATUS_STYLE['Inscripción']
@@ -998,22 +949,26 @@ export default function TorneosAdmin() {
                   <div
                     key={t.id}
                     onClick={() => setSelected(t)}
-                    style={{ background: '#13131a', borderRadius: 12, border: '1px solid #2a2a38', overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s' }}
+                    className="ta-card"
                     onMouseEnter={e => { e.currentTarget.style.borderColor = col; e.currentTarget.style.background = '#161620' }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = '#2a2a38'; e.currentTarget.style.background = '#13131a' }}
                   >
-                    <div style={{ height: 3, background: col }} />
-                    <div style={{ padding: '14px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
-                        <h3 style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 700, margin: 0, flex: 1, paddingRight: 8, lineHeight: 1.4 }}>{t.nombre}</h3>
-                        <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: st.bg, color: st.color, border: `1px solid ${st.border}`, whiteSpace: 'nowrap', flexShrink: 0 }}>{t.estado}</span>
+                    <div className="ta-card-accent" style={{ background: col }} />
+                    <div className="ta-card-body">
+                      <div className="ta-card-head">
+                        <h3 className="ta-card-title">{t.nombre}</h3>
+                        <span
+                          style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20, background: st.bg, color: st.color, border: `1px solid ${st.border}`, whiteSpace: 'nowrap', flexShrink: 0 }}
+                        >
+                          {t.estado}
+                        </span>
                       </div>
-                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 10 }}>
+                      <div className="ta-card-meta">
                         <span style={{ padding: '2px 7px', borderRadius: 20, background: `${col}18`, border: `1px solid ${col}40`, color: col, fontSize: 10, fontWeight: 600 }}>{t.categoriaName}</span>
                         {t.fechaInicio && <span style={{ color: '#6666a0', fontSize: 10 }}>📅 {t.fechaInicio}</span>}
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        <span style={{ color: '#555570', fontSize: 11 }}>Ver detalle →</span>
+                      <div className="ta-card-footer">
+                        <span className="ta-card-footer-text">Ver detalle →</span>
                       </div>
                     </div>
                   </div>
@@ -1024,7 +979,7 @@ export default function TorneosAdmin() {
         </div>
       )}
 
-      {/* ── MODALS (always mounted regardless of list/detail view) ── */}
+      {/* ── MODALS ── */}
       {showNew && <NewTorneoModal onClose={() => setShowNew(false)} onCreated={handleCreated} />}
       {editModal && <EditTorneoModal torneo={editModal} onClose={() => setEditModal(null)} onSaved={() => { setEditModal(null); load() }} />}
       {duplasModal && (
@@ -1041,19 +996,19 @@ export default function TorneosAdmin() {
         />
       )}
       {fixtureConfirm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 20 }}>
-          <div style={{ background: '#1a1a22', border: '1px solid #2a2a38', borderRadius: 14, padding: 32, maxWidth: 380, width: '100%', textAlign: 'center' }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>⚡</div>
-            <h3 style={{ color: '#f1f1f5', fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>¿Generar fixture?</h3>
-            <p style={{ color: '#9999b0', fontSize: 14, margin: '0 0 6px' }}><strong style={{ color: '#f1f1f5' }}>{fixtureConfirm.nombre}</strong></p>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 10 }}>
-              <span style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.25)', color: '#f97316', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>{fixtureConfirm.tamanoZona || 4} parejas / zona</span>
-              <span style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', color: '#8b5cf6', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>{fixtureConfirm.clasificadosPorZona || 1} clasifican</span>
+        <div className="ta-modal-overlay" style={{ zIndex: 1200 }}>
+          <div className="ta-confirm-modal">
+            <div className="ta-confirm-icon">⚡</div>
+            <h3 className="ta-confirm-title">¿Generar fixture?</h3>
+            <p className="ta-confirm-name"><strong style={{ color: '#f1f1f5' }}>{fixtureConfirm.nombre}</strong></p>
+            <div className="ta-confirm-badges">
+              <span className="ta-confirm-badge-orange">{fixtureConfirm.tamanoZona || 4} parejas / zona</span>
+              <span className="ta-confirm-badge-purple">{fixtureConfirm.clasificadosPorZona || 1} clasifican</span>
             </div>
-            <p style={{ color: '#9999b0', fontSize: 13, margin: '0 0 24px' }}>Se generarán las zonas y cruces automáticamente. Si ya existía un fixture, será reemplazado.</p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button onClick={() => setFixtureConfirm(null)} disabled={generatingFixture} style={{ background: 'transparent', border: '1px solid #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 13, padding: '9px 20px', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={() => handleGenerateFixture(fixtureConfirm.id)} disabled={generatingFixture} style={{ background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: generatingFixture ? 'wait' : 'pointer', opacity: generatingFixture ? 0.7 : 1 }}>
+            <p className="ta-confirm-desc">Se generarán las zonas y cruces automáticamente. Si ya existía un fixture, será reemplazado.</p>
+            <div className="ta-confirm-actions">
+              <button onClick={() => setFixtureConfirm(null)} disabled={generatingFixture} className="ta-btn-secondary">Cancelar</button>
+              <button onClick={() => handleGenerateFixture(fixtureConfirm.id)} disabled={generatingFixture} className="ta-btn-purple" style={{ cursor: generatingFixture ? 'wait' : 'pointer', opacity: generatingFixture ? 0.7 : 1 }}>
                 {generatingFixture ? 'Generando...' : '⚡ Generar'}
               </button>
             </div>
@@ -1061,19 +1016,19 @@ export default function TorneosAdmin() {
         </div>
       )}
       {llaveConfirm && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 20 }}>
-          <div style={{ background: '#1a1a22', border: '1px solid #2a2a38', borderRadius: 14, padding: 32, maxWidth: 380, width: '100%', textAlign: 'center' }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>🏅</div>
-            <h3 style={{ color: '#f1f1f5', fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>¿Generar llave?</h3>
-            <p style={{ color: '#9999b0', fontSize: 14, margin: '0 0 6px' }}><strong style={{ color: '#f1f1f5' }}>{llaveConfirm.nombre}</strong></p>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginBottom: 12 }}>
-              <span style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.25)', color: '#10b981', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>{(llaveConfirm.zonas || 1)} zona{(llaveConfirm.zonas || 1) !== 1 ? 's' : ''}</span>
-              <span style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.25)', color: '#8b5cf6', borderRadius: 6, fontSize: 12, fontWeight: 600, padding: '3px 10px' }}>{llaveConfirm.clasificadosPorZona || 1} clasifican / zona</span>
+        <div className="ta-modal-overlay" style={{ zIndex: 1200 }}>
+          <div className="ta-confirm-modal">
+            <div className="ta-confirm-icon">🏅</div>
+            <h3 className="ta-confirm-title">¿Generar llave?</h3>
+            <p className="ta-confirm-name"><strong style={{ color: '#f1f1f5' }}>{llaveConfirm.nombre}</strong></p>
+            <div className="ta-confirm-badges">
+              <span className="ta-confirm-badge-green">{(llaveConfirm.zonas || 1)} zona{(llaveConfirm.zonas || 1) !== 1 ? 's' : ''}</span>
+              <span className="ta-confirm-badge-purple">{llaveConfirm.clasificadosPorZona || 1} clasifican / zona</span>
             </div>
-            <p style={{ color: '#9999b0', fontSize: 13, margin: '0 0 24px' }}>Se arma el bracket con los clasificados de la fase de grupos. Si ya existía una llave, será reemplazada.</p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button onClick={() => setLlaveConfirm(null)} disabled={generatingLlave} style={{ background: 'transparent', border: '1px solid #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 13, padding: '9px 20px', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={() => handleGenerateLlave(llaveConfirm.id)} disabled={generatingLlave} style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: generatingLlave ? 'wait' : 'pointer', opacity: generatingLlave ? 0.7 : 1 }}>
+            <p className="ta-confirm-desc">Se arma el bracket con los clasificados de la fase de grupos. Si ya existía una llave, será reemplazada.</p>
+            <div className="ta-confirm-actions">
+              <button onClick={() => setLlaveConfirm(null)} disabled={generatingLlave} className="ta-btn-secondary">Cancelar</button>
+              <button onClick={() => handleGenerateLlave(llaveConfirm.id)} disabled={generatingLlave} className="ta-btn-green" style={{ cursor: generatingLlave ? 'wait' : 'pointer', opacity: generatingLlave ? 0.7 : 1 }}>
                 {generatingLlave ? 'Generando...' : '🏅 Generar'}
               </button>
             </div>
@@ -1081,15 +1036,15 @@ export default function TorneosAdmin() {
         </div>
       )}
       {confirmDelete && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 20 }}>
-          <div style={{ background: '#1a1a22', border: '1px solid #2a2a38', borderRadius: 14, padding: 32, maxWidth: 380, width: '100%', textAlign: 'center' }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
-            <h3 style={{ color: '#f1f1f5', fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>¿Eliminar torneo?</h3>
-            <p style={{ color: '#9999b0', fontSize: 14, margin: '0 0 6px' }}><strong style={{ color: '#f1f1f5' }}>{confirmDelete.nombre}</strong></p>
-            <p style={{ color: '#ef4444', fontSize: 13, margin: '0 0 24px' }}>Se eliminarán también todas las duplas, zonas y partidos. Esta acción no se puede deshacer.</p>
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-              <button onClick={() => setConfirmDelete(null)} style={{ background: 'transparent', border: '1px solid #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 13, padding: '9px 20px', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={() => handleDelete(confirmDelete.id)} disabled={deleting} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: deleting ? 'wait' : 'pointer', opacity: deleting ? 0.7 : 1 }}>
+        <div className="ta-modal-overlay" style={{ zIndex: 1200 }}>
+          <div className="ta-confirm-modal">
+            <div className="ta-confirm-icon">⚠️</div>
+            <h3 className="ta-confirm-title">¿Eliminar torneo?</h3>
+            <p className="ta-confirm-name"><strong style={{ color: '#f1f1f5' }}>{confirmDelete.nombre}</strong></p>
+            <p className="ta-confirm-error">Se eliminarán también todas las duplas, zonas y partidos. Esta acción no se puede deshacer.</p>
+            <div className="ta-confirm-actions">
+              <button onClick={() => setConfirmDelete(null)} className="ta-btn-secondary">Cancelar</button>
+              <button onClick={() => handleDelete(confirmDelete.id)} disabled={deleting} className="ta-btn-danger" style={{ cursor: deleting ? 'wait' : 'pointer', opacity: deleting ? 0.7 : 1 }}>
                 {deleting ? 'Eliminando...' : 'Eliminar'}
               </button>
             </div>

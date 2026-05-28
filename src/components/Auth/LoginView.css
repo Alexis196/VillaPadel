@@ -1,0 +1,32 @@
+/* ─── LoginView.css ─── */
+
+.li-page { min-height: 100vh; background: #0f0f13; display: flex; align-items: center; justify-content: center; padding: 24px; }
+.li-card { background: #1a1a22; border-radius: 16px; border: 1px solid #2a2a38; padding: 44px 40px; width: 100%; max-width: 400px; text-align: center; }
+.li-logo-wrap { width: 72px; height: 72px; background: #fff; border-radius: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 22px; box-shadow: 0 0 24px rgba(255,255,255,0.15); }
+.li-logo-img { width: 82%; height: 82%; object-fit: contain; }
+.li-title { color: #f1f1f5; font-size: 21px; font-weight: 700; margin: 0 0 6px; }
+.li-desc { color: #9999b0; font-size: 13px; margin: 0 0 28px; }
+.li-form { text-align: left; }
+.li-field { margin-bottom: 12px; }
+.li-field-last { margin-bottom: 20px; }
+.li-label { display: block; color: #9999b0; font-size: 11px; font-weight: 600; margin-bottom: 6px; letter-spacing: 0.5px; }
+.li-inp {
+  width: 100%; box-sizing: border-box;
+  background: #13131a; border: 1px solid #2a2a38; border-radius: 9px;
+  padding: 11px 14px; color: #f1f1f5; font-size: 14px; outline: none;
+  transition: border-color 0.15s;
+}
+.li-inp:focus { border-color: #f97316; }
+.li-pass-wrap { position: relative; }
+.li-show-btn { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #6666a0; cursor: pointer; font-size: 14px; padding: 4px; line-height: 1; }
+.li-divider { display: flex; align-items: center; gap: 10px; margin: 20px 0; }
+.li-divider-line { flex: 1; height: 1px; background: #2a2a38; }
+.li-divider-text { color: #44445a; font-size: 12px; }
+.li-google-btn {
+  width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+  border: 1px solid #2a2a38; border-radius: 10px; padding: 11px 20px;
+  font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s;
+}
+.li-google-btn:hover:not(:disabled) { border-color: #4a4a5a; }
+.li-google-icon { flex-shrink: 0; }
+.li-error { margin-top: 16px; padding: 10px 14px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); border-radius: 8px; color: #ef4444; font-size: 13px; text-align: left; }
