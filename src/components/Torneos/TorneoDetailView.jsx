@@ -14,7 +14,6 @@ const TABS = [
   { id: 'tabla',          label: 'Tabla',           icon: '📊', component: StandingsView },
   { id: 'partidos',       label: 'Partidos',        icon: '🎾', component: MatchesView },
   { id: 'llave',          label: 'Llave',           icon: '🏅', component: BracketView },
-  { id: 'categorizacion', label: 'Categorización',  icon: '👤', component: PlayersView },
 ]
 
 const ESTADO_CONFIG = {

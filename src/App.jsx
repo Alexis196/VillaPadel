@@ -20,7 +20,14 @@ function AdminRoute({ children }) {
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen" style={{ background: '#0f0f13' }}>
+      <div className="min-h-screen" style={{
+        background: '#0b1020',
+        backgroundImage: `
+          radial-gradient(ellipse at top left,    rgba(14,165,233,0.07) 0%, transparent 45%),
+          radial-gradient(ellipse at bottom right, rgba(249,115,22,0.07) 0%, transparent 45%)
+        `,
+        backgroundAttachment: 'fixed',
+      }}>
         <Routes>
           {/* Login — no navbar */}
           <Route path="/login" element={<LoginView />} />

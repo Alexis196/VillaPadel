@@ -51,8 +51,8 @@ const FEATURES = [
 function StatItem({ value, label }) {
   return (
     <div style={{ textAlign: 'center' }}>
-      <div style={{ fontSize: 34, fontWeight: 800, color: '#f1f1f5', lineHeight: 1, marginBottom: 4 }}>{value}</div>
-      <div style={{ fontSize: 11, color: '#9999b0', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
+      <div className="stat-value">{value}</div>
+      <div className="stat-label">{label}</div>
     </div>
   )
 }
@@ -64,49 +64,42 @@ function MatchRow({ match, last }) {
   const bWon = fin && (match.ptsB || 0) > (match.ptsA || 0)
 
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: '1fr auto 1fr',
-      alignItems: 'center',
-      gap: 12,
-      padding: '10px 0',
-      borderBottom: last ? 'none' : '1px solid #1e1e28',
-    }}>
+    <div className="match-row" style={{ borderBottom: last ? 'none' : undefined }}>
       <div style={{ textAlign: 'right' }}>
-        <div style={{ fontSize: 13, fontWeight: aWon ? 600 : 400, color: aWon ? '#f1f1f5' : '#9999b0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontSize: 13, fontWeight: aWon ? 600 : 400, color: aWon ? '#fff' : 'rgba(255,255,255,.52)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {match.duplaA?.jugador1}
         </div>
-        <div style={{ fontSize: 11, color: aWon ? '#9999b0' : '#55556a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontSize: 11, color: aWon ? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.28)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>
           {match.duplaA?.jugador2}
         </div>
       </div>
 
-      <div style={{ textAlign: 'center', minWidth: 60 }}>
+      <div style={{ textAlign: 'center', minWidth: 64 }}>
         {live ? (
-          <span style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', background: 'rgba(34,197,94,0.12)', borderRadius: 4, padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block', flexShrink: 0 }} />
+          <span className="badge badge-live" style={{ whiteSpace: 'nowrap' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ade80', display: 'inline-block', flexShrink: 0 }} />
             EN VIVO
           </span>
         ) : fin ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
-            <span style={{ fontSize: 22, fontWeight: 800, color: aWon ? '#f97316' : '#6666a0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, justifyContent: 'center' }}>
+            <span style={{ fontSize: 22, fontWeight: 800, color: aWon ? 'var(--orange-light)' : 'rgba(255,255,255,.28)' }}>
               {match.resultado?.setsA}
             </span>
-            <span style={{ fontSize: 12, color: '#3a3a50' }}>–</span>
-            <span style={{ fontSize: 22, fontWeight: 800, color: bWon ? '#f97316' : '#6666a0' }}>
+            <span style={{ fontSize: 12, color: 'rgba(255,255,255,.18)' }}>–</span>
+            <span style={{ fontSize: 22, fontWeight: 800, color: bWon ? 'var(--orange-light)' : 'rgba(255,255,255,.28)' }}>
               {match.resultado?.setsB}
             </span>
           </div>
         ) : (
-          <span style={{ fontSize: 11, color: '#44445a', fontWeight: 600 }}>vs</span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,.22)', fontWeight: 600 }}>vs</span>
         )}
       </div>
 
       <div style={{ textAlign: 'left' }}>
-        <div style={{ fontSize: 13, fontWeight: bWon ? 600 : 400, color: bWon ? '#f1f1f5' : '#9999b0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontSize: 13, fontWeight: bWon ? 600 : 400, color: bWon ? '#fff' : 'rgba(255,255,255,.52)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {match.duplaB?.jugador1}
         </div>
-        <div style={{ fontSize: 11, color: bWon ? '#9999b0' : '#55556a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontSize: 11, color: bWon ? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.28)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', marginTop: 1 }}>
           {match.duplaB?.jugador2}
         </div>
       </div>
@@ -132,129 +125,146 @@ export default function LandingView() {
     <div>
 
       {/* ── HERO ── */}
-      <div style={{
-        position: 'relative',
-        backgroundImage: `url(${BgImg})`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center 40%',
-        minHeight: isMobile ? 420 : 500,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}>
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(to bottom, rgba(0,0,0,0.62) 0%, rgba(15,15,19,0.94) 100%)',
-        }} />
+      <div className="hero-section" style={{ minHeight: isMobile ? 520 : 720 }}>
+        <div
+          className="hero-bg"
+          style={{ backgroundImage: `url(${BgImg})` }}
+        />
+        <div className="hero-overlay" />
+        <div className="hero-glow-orange" />
+        <div className="hero-glow-blue" />
 
-        <div style={{
-          position: 'relative', zIndex: 1,
-          maxWidth: 700, width: '100%',
-          padding: isMobile ? '52px 20px 44px' : '72px 24px 56px',
-          textAlign: 'center',
-          display: 'flex', flexDirection: 'column', alignItems: 'center',
-        }}>
+        <div className="hero-content" style={{ padding: isMobile ? '52px 18px 44px' : undefined }}>
           <img
             src={Logofondo}
             alt="VillaPadel"
-            style={{ height: isMobile ? 70 : 88, width: 'auto', borderRadius: 14, marginBottom: 20, display: 'block' }}
+            className="hero-logo animate-fadein"
+            style={{ height: isMobile ? 72 : 92 }}
           />
 
-          <h1 style={{
-            color: '#f1f1f5', fontSize: isMobile ? 36 : 54, fontWeight: 800,
-            margin: '0 0 10px', letterSpacing: '-2px', lineHeight: 1.05,
-          }}>
+          <h1 className="hero-title animate-fadein-delay-1">
             Villa
-            <span style={{
-              color: '#f97316', fontSize: isMobile ? 36 : 54, fontWeight: 800,
-            }}>
-              Padel
-            </span>
+            <span className="hero-title-accent">Padel</span>
           </h1>
-          <p style={{ color: '#b0b0c8', fontSize: isMobile ? 14 : 16, margin: '0 0 36px', lineHeight: 1.6, maxWidth: 380 }}>
+
+          <p className="hero-desc animate-fadein-delay-2" style={{ fontSize: isMobile ? 14 : undefined }}>
             Seguí los torneos, resultados y tabla de posiciones de VillaPadel Club.
           </p>
 
-          {/* Stats */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: isMobile ? 20 : 44,
-            background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: 16, padding: isMobile ? '14px 22px' : '18px 40px',
-          }}>
+          {/* Stats bar */}
+          <div className="hero-stats animate-fadein-delay-3" style={{ gap: isMobile ? 20 : undefined, padding: isMobile ? '15px 22px' : undefined }}>
             <StatItem value={torneos.length} label="Torneos" />
-            <div style={{ width: 1, height: 36, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
+            <div className="stat-divider" />
             <StatItem value={totalJugadores || '–'} label="Jugadores" />
-            <div style={{ width: 1, height: 36, background: 'rgba(255,255,255,0.1)', flexShrink: 0 }} />
+            <div className="stat-divider" />
             <StatItem value={enCurso} label="En curso" />
           </div>
         </div>
       </div>
 
       {/* ── BODY ── */}
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: isMobile ? '28px 14px 60px' : '40px 24px 60px' }}>
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: isMobile ? '28px 14px 64px' : '44px 24px 72px' }}>
 
         {/* Feature cards */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)',
-          gap: 10, marginBottom: 32,
-        }}>
-          {FEATURES.map(f => (
-            <div
-              key={f.title}
-              style={{
-                background: '#1a1a22', border: '1px solid #2a2a38', borderRadius: 12,
-                padding: isMobile ? '16px 12px' : '20px 18px', textAlign: 'center',
-              }}
-            >
-              <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'center', color: '#f97316' }}>{f.icon(isMobile ? 24 : 28)}</div>
-              <div style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 700, marginBottom: 5 }}>{f.title}</div>
-              <div style={{ color: '#6666a0', fontSize: 12, lineHeight: 1.45 }}>{f.desc}</div>
-            </div>
-          ))}
+        <div style={{ marginBottom: 36 }}>
+          <p style={{
+            color: '#f97316',
+            fontSize: 11,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '1.5px',
+            margin: '0 0 8px',
+          }}>
+            Explorá la plataforma
+          </p>
+          <h2 style={{
+            fontSize: isMobile ? 18 : 22,
+            fontWeight: 800,
+            color: '#fff',
+            margin: '0 0 20px',
+            letterSpacing: '-0.3px',
+          }}>
+            Todo lo que encontrás en VillaPadel
+          </h2>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)',
+            gap: isMobile ? 10 : 14,
+          }}>
+            {FEATURES.map((f, i) => (
+              <div
+                key={f.title}
+                className="feature-card animate-fadein"
+                style={{
+                  animationDelay: `${i * 0.06}s`,
+                  padding: isMobile ? '18px 12px' : undefined,
+                  border: '1px solid rgba(255,255,255,0.03)',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+                  transition: 'all 0.25s ease',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.transform = 'translateY(-3px)'
+                  e.currentTarget.style.borderColor = 'rgba(249,115,22,0.3)'
+                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.4), 0 0 20px rgba(249,115,22,0.05)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.transform = 'translateY(0)'
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.03)'
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)'
+                }}
+              >
+                <div className="feature-icon">{f.icon(isMobile ? 24 : 28)}</div>
+                <div className="feature-title">{f.title}</div>
+                <div className="feature-desc">{f.desc}</div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* CTA */}
-        <div style={{ textAlign: 'center', marginBottom: 44 }}>
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
           <button
+            className="btn-primary"
             onClick={() => navigate('/torneos')}
-            style={{
-              padding: '14px 48px', borderRadius: 10, border: 'none',
-              background: '#f97316', color: '#fff', fontSize: 16, fontWeight: 700,
-              cursor: 'pointer', letterSpacing: '-0.2px', transition: 'background 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#ea6c0e' }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#f97316' }}
+            style={{ padding: isMobile ? '13px 36px' : undefined }}
           >
-            Ir a torneos →
+            Ver torneos →
           </button>
         </div>
 
-        {/* Partidos en vivo */}
+        {/* Partidos */}
         {partidosDestacados.length > 0 && (
-          <div style={{ background: '#1a1a22', border: '1px solid #2a2a38', borderRadius: 14, overflow: 'hidden' }}>
-            <div style={{
-              padding: '13px 18px', borderBottom: '1px solid #2a2a38',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
+          <div
+            className="match-section animate-fadein"
+            style={{
+              background: '#15151e',
+              border: '1px solid rgba(255,255,255,0.05)',
+              borderTop: '2px solid #f97316',
+              borderRadius: 12,
+              boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+            }}
+          >
+            <div className="match-section-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ color: '#f1f1f5', fontSize: 14, fontWeight: 700 }}>Partidos en vivo</span>
+                <span style={{ color: '#fff', fontSize: 14, fontWeight: 700, fontFamily: 'var(--font-display)' }}>
+                  Partidos recientes
+                </span>
                 {activeTorneo && (
-                  <span style={{ color: '#6666a0', fontSize: 12 }}>{activeTorneo.nombre}</span>
+                  <span style={{ color: 'rgba(255,255,255,.38)', fontSize: 12 }}>{activeTorneo.nombre}</span>
                 )}
               </div>
               {activeTorneo && (
                 <button
+                  className="btn-text-link"
                   onClick={() => navigate(`/torneos/${activeTorneo.id}`)}
-                  style={{ background: 'none', border: 'none', color: '#f97316', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0 }}
                 >
                   Ver todos →
                 </button>
               )}
             </div>
 
-            <div style={{ padding: '2px 18px 8px' }}>
+            <div style={{ padding: '2px 0 4px' }}>
               {partidosDestacados.map((m, i) => (
                 <MatchRow key={m.id} match={m} last={i === partidosDestacados.length - 1} />
               ))}
