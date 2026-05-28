@@ -189,11 +189,6 @@ export default function LoginView() {
           </div>
         )}
 
-        <p style={{ color: '#44445a', fontSize: 11, margin: '24px 0 0', lineHeight: 1.6 }}>
-          Para acceso por email, activá Email/Contraseña en Firebase Console → Authentication.
-          Para permisos de admin, agregá el email en{' '}
-          <code style={{ background: '#13131a', padding: '1px 5px', borderRadius: 3, color: '#6666a0' }}>VITE_ADMIN_EMAILS</code>.
-        </p>
       </div>
     </div>
   )

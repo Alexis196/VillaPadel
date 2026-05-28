@@ -58,11 +58,11 @@ export default function TorneoDetailView() {
 
   return (
     <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Tournament header + tabs */}
+      {/* Tournament header */}
       <div style={{ background: '#13131a', borderBottom: '1px solid #2a2a38', position: 'sticky', top: 0, zIndex: 50 }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: isMobile ? '12px 14px 0' : '14px 24px 0' }}>
           {/* Back + name row */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: isMobile ? 12 : 10 }}>
             <button
               onClick={() => navigate('/torneos')}
               style={{
@@ -96,39 +96,70 @@ export default function TorneoDetailView() {
             )}
           </div>
 
-          {/* Tab bar */}
-          <div style={{ display: 'flex', overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  padding: isMobile ? '9px 12px' : '10px 18px',
-                  border: 'none', background: 'transparent', cursor: 'pointer',
-                  color: activeTab === tab.id ? '#f97316' : '#9999b0',
-                  fontSize: isMobile ? 12 : 13,
-                  fontWeight: activeTab === tab.id ? 600 : 400,
-                  borderBottom: `2px solid ${activeTab === tab.id ? '#f97316' : 'transparent'}`,
-                  transition: 'color 0.15s, border-color 0.15s',
-                  whiteSpace: 'nowrap', flexShrink: 0,
-                  display: 'flex', alignItems: 'center', gap: 5,
-                  marginBottom: -1,
-                }}
-                onMouseEnter={e => { if (activeTab !== tab.id) e.currentTarget.style.color = '#f1f1f5' }}
-                onMouseLeave={e => { if (activeTab !== tab.id) e.currentTarget.style.color = '#9999b0' }}
-              >
-                <span style={{ fontSize: isMobile ? 13 : 14 }}>{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          {/* Tab bar — desktop only (mobile uses bottom nav) */}
+          {!isMobile && (
+            <div style={{ display: 'flex', overflowX: 'auto', scrollbarWidth: 'none' }}>
+              {TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  style={{
+                    padding: '10px 18px',
+                    border: 'none', background: 'transparent', cursor: 'pointer',
+                    color: activeTab === tab.id ? '#f97316' : '#9999b0',
+                    fontSize: 13,
+                    fontWeight: activeTab === tab.id ? 600 : 400,
+                    borderBottom: `2px solid ${activeTab === tab.id ? '#f97316' : 'transparent'}`,
+                    transition: 'color 0.15s, border-color 0.15s',
+                    whiteSpace: 'nowrap', flexShrink: 0,
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    marginBottom: -1,
+                  }}
+                  onMouseEnter={e => { if (activeTab !== tab.id) e.currentTarget.style.color = '#f1f1f5' }}
+                  onMouseLeave={e => { if (activeTab !== tab.id) e.currentTarget.style.color = '#9999b0' }}
+                >
+                  <span style={{ fontSize: 14 }}>{tab.icon}</span>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Tab content */}
-      <div style={{ flex: 1, paddingBottom: isMobile ? 16 : 0 }}>
+      <div style={{ flex: 1, paddingBottom: isMobile ? 60 : 0 }}>
         <ActiveComponent />
       </div>
+
+      {/* Mobile bottom tab bar */}
+      {isMobile && (
+        <nav style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+          background: '#13131a', borderTop: '1px solid #2a2a38',
+          display: 'flex',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}>
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                padding: '8px 2px 6px', border: 'none', cursor: 'pointer',
+                background: activeTab === tab.id ? 'rgba(249,115,22,0.08)' : 'transparent',
+                color: activeTab === tab.id ? '#f97316' : '#6666a0',
+                fontSize: 9, fontWeight: activeTab === tab.id ? 600 : 400,
+                borderTop: `2px solid ${activeTab === tab.id ? '#f97316' : 'transparent'}`,
+                transition: 'color 0.15s',
+              }}
+            >
+              <span style={{ fontSize: 18, marginBottom: 2, lineHeight: 1 }}>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+      )}
     </div>
   )
 }

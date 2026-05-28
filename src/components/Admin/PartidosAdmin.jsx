@@ -542,27 +542,33 @@ function MatchRow({ match, torneoId, onUpdated, open, onToggle }) {
             <LiveScorePanel match={match} torneoId={torneoId} onUpdated={onUpdated} />
           ) : (
             <>
-              {/* Tabs */}
-              <div style={{ display: 'flex', gap: 4, marginBottom: 14 }}>
-                <button style={tabStyle(tab === 'horario')} onClick={() => setTab('horario')}>📅 Horario</button>
-                <button style={tabStyle(tab === 'resultado')} onClick={() => setTab('resultado')}>⚽ Resultado manual</button>
+              {/* Tab select */}
+              <div style={{ marginBottom: 14 }}>
+                <select
+                  value={tab}
+                  onChange={e => setTab(e.target.value)}
+                  style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, color: '#f1f1f5', fontSize: 13, fontWeight: 600, padding: '8px 12px', cursor: 'pointer', outline: 'none', width: isCardView ? '100%' : 'auto' }}
+                >
+                  <option value="horario">📅 Horario</option>
+                  <option value="resultado">⚽ Resultado manual</option>
+                </select>
               </div>
 
               {tab === 'horario' && (
                 <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                  <div>
+                  <div style={{ flex: isCardView ? '1 1 100%' : 'none' }}>
                     <div style={{ color: '#9999b0', fontSize: 11, marginBottom: 5, fontWeight: 600 }}>FECHA</div>
-                    <input type="date" value={horario.fecha} onChange={e => setHorario(p => ({ ...p, fecha: e.target.value }))} style={{ ...inp, width: 160 }} />
+                    <input type="date" value={horario.fecha} onChange={e => setHorario(p => ({ ...p, fecha: e.target.value }))} style={{ ...inp, width: isCardView ? '100%' : 160 }} />
                   </div>
-                  <div>
+                  <div style={{ flex: isCardView ? '1 1 45%' : 'none' }}>
                     <div style={{ color: '#9999b0', fontSize: 11, marginBottom: 5, fontWeight: 600 }}>HORA</div>
-                    <input type="time" value={horario.hora} onChange={e => setHorario(p => ({ ...p, hora: e.target.value }))} style={{ ...inp, width: 130 }} />
+                    <input type="time" value={horario.hora} onChange={e => setHorario(p => ({ ...p, hora: e.target.value }))} style={{ ...inp, width: isCardView ? '100%' : 130 }} />
                   </div>
-                  <div>
+                  <div style={{ flex: isCardView ? '1 1 45%' : 'none' }}>
                     <div style={{ color: '#9999b0', fontSize: 11, marginBottom: 5, fontWeight: 600 }}>CANCHA</div>
-                    <input placeholder="ej. Cancha 1" value={horario.cancha} onChange={e => setHorario(p => ({ ...p, cancha: e.target.value }))} style={{ ...inp, width: 150 }} />
+                    <input placeholder="ej. Cancha 1" value={horario.cancha} onChange={e => setHorario(p => ({ ...p, cancha: e.target.value }))} style={{ ...inp, width: isCardView ? '100%' : 150 }} />
                   </div>
-                  <button onClick={saveHorario} disabled={saving} style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                  <button onClick={saveHorario} disabled={saving} style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1, flex: isCardView ? '1 1 100%' : 'none' }}>
                     {saving ? '...' : 'Guardar horario'}
                   </button>
                 </div>
@@ -570,41 +576,43 @@ function MatchRow({ match, torneoId, onUpdated, open, onToggle }) {
 
               {tab === 'resultado' && (
                 <div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16, marginBottom: 14 }}>
-                    <div>
-                      <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{match.duplaA?.jugador1} / {match.duplaA?.jugador2}</div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <div>
-                          <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>SETS</div>
-                          <input type="number" min="0" max="3" value={res.setsA} onChange={e => setRes(p => ({ ...p, setsA: e.target.value }))} style={numInp} />
-                        </div>
-                        <div>
-                          <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>GAMES</div>
-                          <input type="number" min="0" value={res.gamesA} onChange={e => setRes(p => ({ ...p, gamesA: e.target.value }))} style={numInp} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 14 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 12, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{match.duplaA?.jugador1} / {match.duplaA?.jugador2}</div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <div>
+                            <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>SETS</div>
+                            <input type="number" min="0" max="3" value={res.setsA} onChange={e => setRes(p => ({ ...p, setsA: e.target.value }))} style={numInp} />
+                          </div>
+                          <div>
+                            <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>GAMES</div>
+                            <input type="number" min="0" value={res.gamesA} onChange={e => setRes(p => ({ ...p, gamesA: e.target.value }))} style={numInp} />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div style={{ color: '#44445a', fontWeight: 700, fontSize: 18 }}>VS</div>
-                    <div>
-                      <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>{match.duplaB?.jugador1} / {match.duplaB?.jugador2}</div>
-                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                        <div>
-                          <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>SETS</div>
-                          <input type="number" min="0" max="3" value={res.setsB} onChange={e => setRes(p => ({ ...p, setsB: e.target.value }))} style={numInp} />
-                        </div>
-                        <div>
-                          <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>GAMES</div>
-                          <input type="number" min="0" value={res.gamesB} onChange={e => setRes(p => ({ ...p, gamesB: e.target.value }))} style={numInp} />
+                      <div style={{ color: '#44445a', fontWeight: 700, fontSize: 16, flexShrink: 0 }}>vs</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 12, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{match.duplaB?.jugador1} / {match.duplaB?.jugador2}</div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <div>
+                            <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>SETS</div>
+                            <input type="number" min="0" max="3" value={res.setsB} onChange={e => setRes(p => ({ ...p, setsB: e.target.value }))} style={numInp} />
+                          </div>
+                          <div>
+                            <div style={{ color: '#9999b0', fontSize: 10, marginBottom: 4 }}>GAMES</div>
+                            <input type="number" min="0" value={res.gamesB} onChange={e => setRes(p => ({ ...p, gamesB: e.target.value }))} style={numInp} />
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ef4444', fontSize: 13, cursor: 'pointer' }}>
                       <input type="checkbox" checked={res.wo} onChange={e => setRes(p => ({ ...p, wo: e.target.checked }))} />
                       W.O.
                     </label>
-                    <button onClick={saveRes} disabled={saving} style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                    <button onClick={saveRes} disabled={saving} style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1, flex: isCardView ? 1 : 'none' }}>
                       {saving ? '...' : 'Guardar resultado'}
                     </button>
                   </div>
@@ -623,6 +631,7 @@ function MatchRow({ match, torneoId, onUpdated, open, onToggle }) {
 // ─── Llave row (bracket matches) ──────────────────────────────────────────────
 function LlaveRow({ llave, torneoId, onUpdated }) {
   const [open, setOpen] = useState(false)
+  const isCardView = useIsMobile(720)
   const [res, setRes] = useState({
     setsA: llave.resultado?.setsA ?? '',
     setsB: llave.resultado?.setsB ?? '',
@@ -699,53 +708,95 @@ function LlaveRow({ llave, torneoId, onUpdated }) {
 
   return (
     <div style={{ borderBottom: '1px solid #20202c' }}>
-      <div
-        style={{
-          display: 'grid', gridTemplateColumns: '120px 1fr 1fr 130px 60px',
-          alignItems: 'center', padding: '0 16px', height: 54, gap: 12,
-          cursor: canEdit ? 'pointer' : 'default', transition: 'background 0.12s',
-        }}
-        onClick={() => canEdit && setOpen(o => !o)}
-        onMouseEnter={e => { if (canEdit) e.currentTarget.style.background = '#1a1a22' }}
-        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-      >
-        <div>
-          <span style={{ color: '#a78bfa', fontSize: 11, fontWeight: 700, letterSpacing: '0.3px' }}>{llave.roundName}</span>
-        </div>
-        <div>
-          {duplaA ? (
-            <>
-              <div style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 600 }}>{duplaA.jugador1}</div>
-              <div style={{ color: '#9999b0', fontSize: 11 }}>{duplaA.jugador2}</div>
-            </>
-          ) : (
-            <div style={{ color: '#44445a', fontSize: 12, fontStyle: 'italic' }}>Por definir</div>
-          )}
-        </div>
-        <div>
-          {duplaB ? (
-            <>
-              <div style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 600 }}>{duplaB.jugador1}</div>
-              <div style={{ color: '#9999b0', fontSize: 11 }}>{duplaB.jugador2}</div>
-            </>
-          ) : (
-            <div style={{ color: '#44445a', fontSize: 12, fontStyle: 'italic' }}>Por definir</div>
-          )}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ padding: '2px 8px', borderRadius: 20, background: cfg.bg, color: cfg.color, fontSize: 11, fontWeight: 600 }}>
-            {llave.estado}
-          </span>
-          {llave.resultado && (
-            <span style={{ color: '#f97316', fontSize: 13, fontWeight: 700 }}>
-              {llave.resultado.setsA}–{llave.resultado.setsB}
+      {isCardView ? (
+        <div
+          style={{ padding: '10px 14px', cursor: canEdit ? 'pointer' : 'default', transition: 'background 0.12s' }}
+          onClick={() => canEdit && setOpen(o => !o)}
+          onMouseEnter={e => { if (canEdit) e.currentTarget.style.background = '#1a1a22' }}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span style={{ color: '#a78bfa', fontSize: 11, fontWeight: 700 }}>{llave.roundName}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ padding: '2px 8px', borderRadius: 20, background: cfg.bg, color: cfg.color, fontSize: 11, fontWeight: 600 }}>{llave.estado}</span>
+              {canEdit && <span style={{ color: '#44445a', fontSize: 14 }}>{open ? '▲' : '▼'}</span>}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {duplaA ? (
+                <>
+                  <div style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{duplaA.jugador1}</div>
+                  <div style={{ color: '#9999b0', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{duplaA.jugador2}</div>
+                </>
+              ) : (
+                <div style={{ color: '#44445a', fontSize: 12, fontStyle: 'italic' }}>Por definir</div>
+              )}
+            </div>
+            <span style={{ color: llave.resultado ? '#f97316' : '#44445a', fontWeight: 700, fontSize: llave.resultado ? 15 : 13, flexShrink: 0 }}>
+              {llave.resultado ? `${llave.resultado.setsA}–${llave.resultado.setsB}` : 'vs'}
             </span>
-          )}
+            <div style={{ flex: 1, minWidth: 0, textAlign: 'right' }}>
+              {duplaB ? (
+                <>
+                  <div style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{duplaB.jugador1}</div>
+                  <div style={{ color: '#9999b0', fontSize: 11, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{duplaB.jugador2}</div>
+                </>
+              ) : (
+                <div style={{ color: '#44445a', fontSize: 12, fontStyle: 'italic' }}>Por definir</div>
+              )}
+            </div>
+          </div>
         </div>
-        <div style={{ textAlign: 'right', color: '#44445a', fontSize: 18 }}>
-          {canEdit && (open ? '▲' : '▼')}
+      ) : (
+        <div
+          style={{
+            display: 'grid', gridTemplateColumns: '120px 1fr 1fr 130px 60px',
+            alignItems: 'center', padding: '0 16px', height: 54, gap: 12,
+            cursor: canEdit ? 'pointer' : 'default', transition: 'background 0.12s',
+          }}
+          onClick={() => canEdit && setOpen(o => !o)}
+          onMouseEnter={e => { if (canEdit) e.currentTarget.style.background = '#1a1a22' }}
+          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+        >
+          <div>
+            <span style={{ color: '#a78bfa', fontSize: 11, fontWeight: 700, letterSpacing: '0.3px' }}>{llave.roundName}</span>
+          </div>
+          <div>
+            {duplaA ? (
+              <>
+                <div style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 600 }}>{duplaA.jugador1}</div>
+                <div style={{ color: '#9999b0', fontSize: 11 }}>{duplaA.jugador2}</div>
+              </>
+            ) : (
+              <div style={{ color: '#44445a', fontSize: 12, fontStyle: 'italic' }}>Por definir</div>
+            )}
+          </div>
+          <div>
+            {duplaB ? (
+              <>
+                <div style={{ color: '#f1f1f5', fontSize: 13, fontWeight: 600 }}>{duplaB.jugador1}</div>
+                <div style={{ color: '#9999b0', fontSize: 11 }}>{duplaB.jugador2}</div>
+              </>
+            ) : (
+              <div style={{ color: '#44445a', fontSize: 12, fontStyle: 'italic' }}>Por definir</div>
+            )}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ padding: '2px 8px', borderRadius: 20, background: cfg.bg, color: cfg.color, fontSize: 11, fontWeight: 600 }}>
+              {llave.estado}
+            </span>
+            {llave.resultado && (
+              <span style={{ color: '#f97316', fontSize: 13, fontWeight: 700 }}>
+                {llave.resultado.setsA}–{llave.resultado.setsB}
+              </span>
+            )}
+          </div>
+          <div style={{ textAlign: 'right', color: '#44445a', fontSize: 18 }}>
+            {canEdit && (open ? '▲' : '▼')}
+          </div>
         </div>
-      </div>
+      )}
 
       {open && canEdit && (
         <div style={{ background: '#13131a', borderTop: '1px solid #2a2a38', padding: '14px 16px' }}>
@@ -788,9 +839,9 @@ function LlaveRow({ llave, torneoId, onUpdated }) {
             />
           ) : (
             <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: 16, marginBottom: 14 }}>
-                <div>
-                  <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 14 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 12, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {duplaA.jugador1}{duplaA.jugador2 ? ` / ${duplaA.jugador2}` : ''}
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -804,9 +855,9 @@ function LlaveRow({ llave, torneoId, onUpdated }) {
                     </div>
                   </div>
                 </div>
-                <div style={{ color: '#44445a', fontWeight: 700, fontSize: 18 }}>VS</div>
-                <div>
-                  <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 13, marginBottom: 6 }}>
+                <div style={{ color: '#44445a', fontWeight: 700, fontSize: 16, flexShrink: 0 }}>vs</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ color: '#f1f1f5', fontWeight: 600, fontSize: 12, marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {duplaB.jugador1}{duplaB.jugador2 ? ` / ${duplaB.jugador2}` : ''}
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -821,12 +872,12 @@ function LlaveRow({ llave, torneoId, onUpdated }) {
                   </div>
                 </div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ef4444', fontSize: 13, cursor: 'pointer' }}>
                   <input type="checkbox" checked={res.wo} onChange={e => setRes(p => ({ ...p, wo: e.target.checked }))} />
                   W.O.
                 </label>
-                <button onClick={saveRes} disabled={saving} style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>
+                <button onClick={saveRes} disabled={saving} style={{ background: '#22c55e', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1, flex: isCardView ? 1 : 'none' }}>
                   {saving ? '...' : 'Guardar resultado'}
                 </button>
               </div>
@@ -1016,29 +1067,15 @@ export default function PartidosAdmin() {
 
       {/* View mode toggle (shown when bracket exists) */}
       {llaves.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-          <button
-            onClick={() => setViewMode('grupos')}
-            style={{
-              padding: '7px 18px', borderRadius: 8, border: '1px solid', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              borderColor: viewMode === 'grupos' ? '#f97316' : '#2a2a38',
-              background: viewMode === 'grupos' ? 'rgba(249,115,22,0.12)' : 'transparent',
-              color: viewMode === 'grupos' ? '#f97316' : '#9999b0',
-            }}
+        <div style={{ marginBottom: 16 }}>
+          <select
+            value={viewMode}
+            onChange={e => setViewMode(e.target.value)}
+            style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 8, color: '#f1f1f5', fontSize: 13, fontWeight: 600, padding: '8px 14px', cursor: 'pointer', outline: 'none' }}
           >
-            Fase de Grupos ({partidos.length})
-          </button>
-          <button
-            onClick={() => setViewMode('llave')}
-            style={{
-              padding: '7px 18px', borderRadius: 8, border: '1px solid', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              borderColor: viewMode === 'llave' ? '#a78bfa' : '#2a2a38',
-              background: viewMode === 'llave' ? 'rgba(167,139,250,0.12)' : 'transparent',
-              color: viewMode === 'llave' ? '#a78bfa' : '#9999b0',
-            }}
-          >
-            Llave ({llaves.filter(l => l.estado !== 'BYE').length} partidos)
-          </button>
+            <option value="grupos">Fase de Grupos ({partidos.length})</option>
+            <option value="llave">Llave ({llaves.filter(l => l.estado !== 'BYE').length} partidos)</option>
+          </select>
         </div>
       )}
 
@@ -1145,11 +1182,13 @@ export default function PartidosAdmin() {
                     <div style={{ flex: 1, height: 1, background: '#2a2a38' }} />
                   </div>
                   <div style={{ background: '#13131a', borderRadius: 12, border: '1px solid #2a2a38', overflow: 'hidden' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 130px 60px', padding: '0 16px', height: 36, borderBottom: '1px solid #2a2a38', background: '#0f0f13', alignItems: 'center', gap: 12 }}>
-                      {['Ronda', 'Dupla A', 'Dupla B', 'Estado', ''].map(h => (
-                        <div key={h} style={{ color: '#6666a0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>{h}</div>
-                      ))}
-                    </div>
+                    {!isCardView && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 130px 60px', padding: '0 16px', height: 36, borderBottom: '1px solid #2a2a38', background: '#0f0f13', alignItems: 'center', gap: 12 }}>
+                        {['Ronda', 'Dupla A', 'Dupla B', 'Estado', ''].map(h => (
+                          <div key={h} style={{ color: '#6666a0', fontSize: 11, fontWeight: 600, textTransform: 'uppercase' }}>{h}</div>
+                        ))}
+                      </div>
+                    )}
                     {matches.map(l => (
                       <LlaveRow
                         key={l.id}

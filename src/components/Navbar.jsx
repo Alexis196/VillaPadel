@@ -103,14 +103,34 @@ export default function Navbar() {
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 52 }}>
 
-            {/* Logo → landing */}
-            <NavLink to="/" style={{ textDecoration: 'none', flexShrink: 0, lineHeight: 0 }}>
-              <img
-                src={Logo}
-                alt="VillaPadel"
-                style={{ height: isMobile ? 36 : 44, width: 'auto', borderRadius: 6, display: 'block' }}
-              />
-            </NavLink>
+            {/* Logo + hamburger (left) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+              <NavLink to="/" style={{ textDecoration: 'none', lineHeight: 0 }}>
+                <img
+                  src={Logo}
+                  alt="VillaPadel"
+                  style={{ height: isMobile ? 36 : 44, width: 'auto', borderRadius: 6, display: 'block' }}
+                />
+              </NavLink>
+              {isMobile && (
+                <button
+                  onClick={() => setDrawerOpen(v => !v)}
+                  style={{
+                    background: drawerOpen ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)',
+                    border: `1px solid ${drawerOpen ? '#f97316' : '#2a2a38'}`,
+                    borderRadius: 8, color: drawerOpen ? '#f97316' : '#9999b0',
+                    width: 36, height: 36, cursor: 'pointer',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
+                    transition: 'all 0.15s', padding: 0, flexShrink: 0,
+                  }}
+                  aria-label="Menú"
+                >
+                  <span style={{ width: 16, height: 2, background: 'currentColor', borderRadius: 2, display: 'block' }} />
+                  <span style={{ width: 16, height: 2, background: 'currentColor', borderRadius: 2, display: 'block' }} />
+                  <span style={{ width: 16, height: 2, background: 'currentColor', borderRadius: 2, display: 'block' }} />
+                </button>
+              )}
+            </div>
 
             {/* Desktop nav */}
             {!isMobile && (
@@ -133,26 +153,8 @@ export default function Navbar() {
               </nav>
             )}
 
-            {/* Right: hamburger (mobile) + user/login */}
+            {/* Right: user/login */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              {isMobile && (
-                <button
-                  onClick={() => setDrawerOpen(v => !v)}
-                  style={{
-                    background: drawerOpen ? 'rgba(249,115,22,0.15)' : 'rgba(255,255,255,0.05)',
-                    border: `1px solid ${drawerOpen ? '#f97316' : '#2a2a38'}`,
-                    borderRadius: 8, color: drawerOpen ? '#f97316' : '#9999b0',
-                    width: 36, height: 36, cursor: 'pointer',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4,
-                    transition: 'all 0.15s', padding: 0, flexShrink: 0,
-                  }}
-                  aria-label="Menú"
-                >
-                  <span style={{ width: 16, height: 2, background: 'currentColor', borderRadius: 2, display: 'block' }} />
-                  <span style={{ width: 16, height: 2, background: 'currentColor', borderRadius: 2, display: 'block' }} />
-                  <span style={{ width: 16, height: 2, background: 'currentColor', borderRadius: 2, display: 'block' }} />
-                </button>
-              )}
               {user ? (
                 <UserMenu user={user} isAdmin={isAdmin} />
               ) : (
