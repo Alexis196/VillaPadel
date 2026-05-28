@@ -6,8 +6,9 @@ import { signOutUser } from '../firebase/auth'
 import { useIsMobile } from '../hooks/useIsMobile'
 
 const navItems = [
-  { to: '/',        label: 'Inicio',   icon: '🏠', end: true },
-  { to: '/torneos', label: 'Torneos',  icon: '🏆', end: false },
+  { to: '/',               label: 'Inicio',         icon: '🏠', end: true },
+  { to: '/torneos',        label: 'Torneos',         icon: '🏆', end: false },
+  { to: '/categorizacion', label: 'Categorización',  icon: '👤', end: false },
 ]
 
 function UserMenu({ user, isAdmin }) {

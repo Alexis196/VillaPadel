@@ -4,6 +4,7 @@ import Navbar from './components/Navbar'
 import LandingView from './components/Landing/LandingView'
 import TorneosListView from './components/Torneos/TorneosListView'
 import TorneoDetailView from './components/Torneos/TorneoDetailView'
+import PlayersView from './components/Players/PlayersView'
 import LoginView from './components/Auth/LoginView'
 import AdminLayout from './components/Admin/AdminLayout'
 import Spinner from './components/ui/Spinner'
@@ -36,11 +37,12 @@ export default function App() {
                   <Route path="/" element={<LandingView />} />
                   <Route path="/torneos" element={<TorneosListView />} />
                   <Route path="/torneos/:id" element={<TorneoDetailView />} />
+                  <Route path="/categorizacion" element={<PlayersView />} />
                   {/* Legacy redirects */}
                   <Route path="/grupos" element={<Navigate to="/torneos" replace />} />
                   <Route path="/tabla" element={<Navigate to="/torneos" replace />} />
                   <Route path="/partidos" element={<Navigate to="/torneos" replace />} />
-                  <Route path="/jugadores" element={<Navigate to="/torneos" replace />} />
+                  <Route path="/jugadores" element={<Navigate to="/categorizacion" replace />} />
                   <Route path="/llave" element={<Navigate to="/torneos" replace />} />
                 </Routes>
               </main>

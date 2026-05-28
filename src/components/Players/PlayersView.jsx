@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useCollection } from '../../hooks/useFirestore'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import Spinner from '../ui/Spinner'
@@ -43,8 +43,10 @@ export default function PlayersView() {
   const [filterCat, setFilterCat] = useState('all')
   const [filterSexo, setFilterSexo] = useState('all')
   const [filterLocalidad, setFilterLocalidad] = useState('all')
-  const [pageSize, setPageSize] = useState(25)
+  const [pageSize, setPageSize] = useState(10)
   const [page, setPage] = useState(1)
+
+  useEffect(() => { setPage(1) }, [search, filterCat, filterSexo, filterLocalidad])
 
   const CAT_PREFIX = { 'cat-1ra': '1ra', 'cat-2da': '2da', 'cat-3ra': '3ra', 'cat-4ta': '4ta', 'cat-5ta': '5ta', 'cat-6ta': '6ta', 'cat-7ma': '7ma', 'cat-8va': '8va' }
 

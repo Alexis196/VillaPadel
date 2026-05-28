@@ -1,12 +1,12 @@
 /**
- * Script de carga: src/assets/jugadores.json → Firestore (colección "players")
+ * Borra toda la colección "players" y reimporta desde src/assets/jugadores.json
  * Uso: node importJugadores.mjs
  */
 import { readFileSync } from 'fs'
 import { initializeApp } from 'firebase/app'
-import { getFirestore, collection, addDoc } from 'firebase/firestore'
+import { getFirestore, collection, getDocs, deleteDoc, addDoc } from 'firebase/firestore'
 
-// --- Leer .env manualmente (sin depender de dotenv) ---
+// --- Leer .env manualmente ---
 const env = {}
 readFileSync('.env', 'utf8').split('\n').forEach(line => {
   const [key, ...rest] = line.split('=')
@@ -22,54 +22,56 @@ const firebaseConfig = {
   appId:             env.VITE_FIREBASE_APP_ID,
 }
 
-// --- Mapa de categorías (igual que CAT_OPTIONS en la app) ---
 const CAT_MAP = {
-  1: { name: '1ra Categoría', color: '#f97316', id: 'cat-1ra' },
-  2: { name: '2da Categoría', color: '#a855f7', id: 'cat-2da' },
-  3: { name: '3ra Categoría', color: '#3b82f6', id: 'cat-3ra' },
-  4: { name: '4ta Categoría', color: '#10b981', id: 'cat-4ta' },
-  5: { name: '5ta Categoría', color: '#06b6d4', id: 'cat-5ta' },
-  6: { name: '6ta Categoría', color: '#84cc16', id: 'cat-6ta' },
-  7: { name: '7ma Categoría', color: '#eab308', id: 'cat-7ma' },
-  8: { name: '8va Categoría', color: '#64748b', id: 'cat-8va' },
+  '1ra': { name: '1ra Categoría', color: '#f97316', id: 'cat-1ra', valor: 1 },
+  '2da': { name: '2da Categoría', color: '#a855f7', id: 'cat-2da', valor: 2 },
+  '3ra': { name: '3ra Categoría', color: '#3b82f6', id: 'cat-3ra', valor: 3 },
+  '4ta': { name: '4ta Categoría', color: '#10b981', id: 'cat-4ta', valor: 4 },
+  '5ta': { name: '5ta Categoría', color: '#06b6d4', id: 'cat-5ta', valor: 5 },
+  '6ta': { name: '6ta Categoría', color: '#84cc16', id: 'cat-6ta', valor: 6 },
+  '7ma': { name: '7ma Categoría', color: '#eab308', id: 'cat-7ma', valor: 7 },
+  '8va': { name: '8va Categoría', color: '#64748b', id: 'cat-8va', valor: 8 },
 }
 
-// --- Inicializar Firebase ---
 const app = initializeApp(firebaseConfig)
 const db = getFirestore(app)
 
-// --- Cargar JSON ---
-const { jugadores } = JSON.parse(readFileSync('src/assets/jugadores.json', 'utf8'))
-
 async function run() {
-  console.log(`Importando ${jugadores.length} jugadores...`)
+  // 1. Borrar todos los jugadores existentes
+  console.log('Borrando jugadores existentes...')
+  const snap = await getDocs(collection(db, 'players'))
+  await Promise.all(snap.docs.map(d => deleteDoc(d.ref)))
+  console.log(`  ✓ ${snap.size} documentos eliminados`)
+
+  // 2. Importar nuevo JSON
+  const jugadores = JSON.parse(readFileSync('src/assets/jugadores.json', 'utf8'))
+  console.log(`\nImportando ${jugadores.length} jugadores...`)
+
   let ok = 0
   let err = 0
 
   for (const j of jugadores) {
-    const valor = Number(j.cat)
-    const cat = CAT_MAP[valor]
+    const cat = CAT_MAP[j.categoryName]
     if (!cat) {
-      console.warn(`  ⚠ Categoría desconocida "${j.cat}" para ${j.nombre} — saltando`)
+      console.warn(`  ⚠ Categoría desconocida "${j.categoryName}" para ${j.name} — saltando`)
       err++
       continue
     }
 
-    const doc = {
-      name:          j.nombre,
-      sexo:          j.sexo,           // "M" o "F"
-      categoriaValor:  valor,
-      categoryName:  cat.name,
-      categoryColor: cat.color,
-      categoriaId:   cat.id,
-    }
-
     try {
-      await addDoc(collection(db, 'players'), doc)
-      console.log(`  ✓ ${j.nombre} (${cat.name})`)
+      await addDoc(collection(db, 'players'), {
+        name:           j.name,
+        sexo:           j.sexo,
+        localidad:      j.localidad || '',
+        categoryName:   cat.name,
+        categoryColor:  cat.color,
+        categoriaId:    cat.id,
+        categoriaValor: cat.valor,
+      })
+      console.log(`  ✓ ${j.name} (${cat.name})`)
       ok++
     } catch (e) {
-      console.error(`  ✗ ${j.nombre}:`, e.message)
+      console.error(`  ✗ ${j.name}:`, e.message)
       err++
     }
   }
