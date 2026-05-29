@@ -143,8 +143,8 @@ export default function StandingsView() {
                           style={{ borderBottom: idx < standings.length - 1 ? '1px solid rgba(255,255,255,.035)' : 'none' }}>
                           <div style={{ width: 44, minWidth: 44, textAlign: 'center', ...posStyle(pos), fontSize: 14 }}>{pos}</div>
                           <div style={{ flex: 1, textAlign: 'left' }}>
-                            <div style={{ color: 'rgba(255,255,255,.9)', fontSize: 13 }}>{row.jugador1}</div>
-                            <div style={{ color: 'rgba(255,255,255,.48)', fontSize: 12 }}>{row.jugador2}</div>
+                            <div style={{ color: 'rgba(255,255,255,.9)', fontSize: 13, fontWeight: 600 }}>{row.jugador1}</div>
+                            <div style={{ color: 'rgba(255,255,255,.9)', fontSize: 13, fontWeight: 600 }}>{row.jugador2}</div>
                           </div>
                           {[row.PJ, row.PG, row.PP, row.setsF, row.setsC].map((v, i) => (
                             <div key={i} className="sv-desktop-stat">{v}</div>

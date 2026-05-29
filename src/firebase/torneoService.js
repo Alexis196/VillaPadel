@@ -62,7 +62,7 @@ function roundRobinSchedule(count) {
 }
 
 // ─── Create tournament ────────────────────────────────────────────────────────
-export async function createTorneo({ nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona }) {
+export async function createTorneo({ nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, fechaFin, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona, ownerUid, ownerEmail }) {
   const today = new Date().toISOString().split('T')[0]
   const estado = fechaInicio > today ? 'Inscripción' : 'En curso'
   const ref = await addDoc(collection(db, 'torneos'), {
@@ -72,6 +72,7 @@ export async function createTorneo({ nombre, categoriaId, categoriaName, categor
     categoriaValor: Number(categoriaValor),
     costoPorJugador: Number(costoPorJugador),
     fechaInicio,
+    fechaFin: fechaFin || null,
     estado,
     tipoTorneo: tipoTorneo || 'categoria',
     modalidadTorneo: modalidadTorneo || 'tradicional',
@@ -79,20 +80,28 @@ export async function createTorneo({ nombre, categoriaId, categoriaName, categor
     color: color || null,
     tamanoZona: Number(tamanoZona) || 4,
     clasificadosPorZona: Number(clasificadosPorZona) || 1,
+    ownerUid: ownerUid || null,
+    ownerEmail: ownerEmail || null,
+    colaboradores: [],
     createdAt: serverTimestamp(),
   })
   return ref.id
 }
 
+// ─── Update tournament collaborators ─────────────────────────────────────────
+export async function updateColaboradores(torneoId, colaboradores) {
+  await setDoc(doc(db, 'torneos', torneoId), { colaboradores }, { merge: true })
+}
+
 // ─── Update tournament ────────────────────────────────────────────────────────
-export async function updateTorneo(id, { nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona }) {
+export async function updateTorneo(id, { nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, fechaFin, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona }) {
   const today = new Date().toISOString().split('T')[0]
   const estado = fechaInicio > today ? 'Inscripción' : 'En curso'
   await setDoc(doc(db, 'torneos', id), {
     nombre, categoriaId, categoriaName,
     categoriaValor: Number(categoriaValor),
     costoPorJugador: Number(costoPorJugador),
-    fechaInicio, estado,
+    fechaInicio, fechaFin: fechaFin || null, estado,
     tipoTorneo: tipoTorneo || 'categoria',
     modalidadTorneo: modalidadTorneo || 'tradicional',
     sexo: sexo || 'masculino',

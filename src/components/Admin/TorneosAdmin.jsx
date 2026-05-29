@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
-import { collection, getDocs, query, orderBy } from 'firebase/firestore'
+import { collection, getDocs, query, orderBy, where } from 'firebase/firestore'
 import { db } from '../../firebase/config'
-import { createTorneo, updateTorneo, deleteTorneo, addDupla, generateFixture, generateBracket } from '../../firebase/torneoService'
+import { createTorneo, updateTorneo, deleteTorneo, addDupla, generateFixture, generateBracket, updateColaboradores } from '../../firebase/torneoService'
+import { useAuth } from '../../contexts/AuthContext'
 import Spinner from '../ui/Spinner'
 import AppSelect from '../ui/AppSelect'
 import { useIsMobile } from '../../hooks/useIsMobile'
@@ -380,9 +381,10 @@ function AddDuplasModal({ torneoId, torneoNombre, torneoEstado, torneoTipoTorneo
 
 function NewTorneoModal({ onClose, onCreated }) {
   const isMobile = useIsMobile()
+  const { user } = useAuth()
   const [form, setForm] = useState({
     nombre: '', tipoTorneo: 'categoria', modalidadTorneo: 'tradicional', categoriaId: 'cat-8va',
-    sumaValor: '', fechaInicio: '', costoPorJugador: '', sexo: 'masculino',
+    sumaValor: '', fechaInicio: '', fechaFin: '', costoPorJugador: '', sexo: 'masculino',
     tamanoZona: 4, clasificadosPorZona: 1,
   })
   const [saving, setSaving] = useState(false)
@@ -421,12 +423,15 @@ function NewTorneoModal({ onClose, onCreated }) {
       categoriaId, categoriaName, categoriaValor,
       costoPorJugador: form.costoPorJugador || 0,
       fechaInicio: form.fechaInicio,
+      fechaFin: form.fechaFin || null,
       tipoTorneo: form.tipoTorneo,
       modalidadTorneo: form.modalidadTorneo,
       color,
       sexo: form.sexo,
       tamanoZona: form.tamanoZona,
       clasificadosPorZona: form.clasificadosPorZona,
+      ownerUid: user?.uid || null,
+      ownerEmail: user?.email || null,
     })
     setSaving(false)
     const catValor = form.tipoTorneo === 'suma' ? Number(form.sumaValor) : CAT_OPTIONS.find(c => c.id === form.categoriaId)?.valor
@@ -513,10 +518,14 @@ function NewTorneoModal({ onClose, onCreated }) {
             </div>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 16, marginBottom: 18 }}>
             <div>
               <label className="ta-label">Fecha de inicio</label>
               <input type="date" value={form.fechaInicio} onChange={e => setForm(p => ({ ...p, fechaInicio: e.target.value }))} className="ta-input" />
+            </div>
+            <div>
+              <label className="ta-label">Fecha de fin</label>
+              <input type="date" value={form.fechaFin} onChange={e => setForm(p => ({ ...p, fechaFin: e.target.value }))} className="ta-input" />
             </div>
             <div>
               <label className="ta-label">Costo por jugador ($)</label>
@@ -579,6 +588,7 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
     categoriaId: isSuma ? 'cat-8va' : (torneo.categoriaId || 'cat-8va'),
     sumaValor: isSuma ? String(torneo.categoriaValor || '') : '',
     fechaInicio: torneo.fechaInicio || '',
+    fechaFin: torneo.fechaFin || '',
     costoPorJugador: torneo.costoPorJugador ? String(torneo.costoPorJugador) : '',
     sexo: torneo.sexo || 'masculino',
     tamanoZona: torneo.tamanoZona || 4,
@@ -609,7 +619,8 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
     await updateTorneo(torneo.id, {
       nombre: form.nombre.trim(), categoriaId, categoriaName, categoriaValor,
       costoPorJugador: form.costoPorJugador || 0,
-      fechaInicio: form.fechaInicio, tipoTorneo: form.tipoTorneo,
+      fechaInicio: form.fechaInicio, fechaFin: form.fechaFin || null,
+      tipoTorneo: form.tipoTorneo,
       modalidadTorneo: form.modalidadTorneo,
       color, sexo: form.sexo,
       tamanoZona: form.tamanoZona,
@@ -674,10 +685,14 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
               <input type="number" placeholder="ej. 15, 14, 13..." value={form.sumaValor} onChange={e => setForm(p => ({ ...p, sumaValor: e.target.value }))} className="ta-input" min="1" />
             </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 16, marginBottom: 18 }}>
             <div>
               <label className="ta-label">Fecha de inicio</label>
               <input type="date" value={form.fechaInicio} onChange={e => setForm(p => ({ ...p, fechaInicio: e.target.value }))} className="ta-input" />
+            </div>
+            <div>
+              <label className="ta-label">Fecha de fin</label>
+              <input type="date" value={form.fechaFin} onChange={e => setForm(p => ({ ...p, fechaFin: e.target.value }))} className="ta-input" />
             </div>
             <div>
               <label className="ta-label">Costo por jugador ($)</label>
@@ -727,7 +742,113 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
   )
 }
 
+function ColaboradoresSection({ torneo, currentUserUid, isOwner, onUpdate }) {
+  const [admins, setAdmins] = useState([])
+  const [loadingAdmins, setLoadingAdmins] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [selectedUid, setSelectedUid] = useState('')
+
+  useEffect(() => {
+    setLoadingAdmins(true)
+    getDocs(query(collection(db, 'users'), where('rol', '==', 'admin')))
+      .then(snap => {
+        setAdmins(snap.docs.map(d => ({ uid: d.id, ...d.data() })).filter(a => a.uid !== currentUserUid))
+        setLoadingAdmins(false)
+      })
+      .catch(() => setLoadingAdmins(false))
+  }, [currentUserUid])
+
+  const colaboradores = torneo.colaboradores || []
+  const available = admins.filter(a => !colaboradores.some(c => c.uid === a.uid))
+
+  async function handleAdd() {
+    if (!selectedUid) return
+    const admin = admins.find(a => a.uid === selectedUid)
+    if (!admin) return
+    const updated = [...colaboradores, { uid: admin.uid, email: admin.email, displayName: admin.displayName || admin.email }]
+    setSaving(true)
+    await updateColaboradores(torneo.id, updated)
+    setSelectedUid('')
+    onUpdate()
+    setSaving(false)
+  }
+
+  async function handleRemove(uid) {
+    const updated = colaboradores.filter(c => c.uid !== uid)
+    setSaving(true)
+    await updateColaboradores(torneo.id, updated)
+    onUpdate()
+    setSaving(false)
+  }
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div className="ta-section-heading">Colaboradores</div>
+      <div style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 10, padding: '14px 16px' }}>
+        {colaboradores.length === 0 ? (
+          <p style={{ color: '#6666a0', fontSize: 13, margin: isOwner ? '0 0 12px' : 0 }}>
+            Sin colaboradores. Solo el dueño puede ver y editar este torneo.
+          </p>
+        ) : (
+          <div style={{ marginBottom: isOwner ? 12 : 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {colaboradores.map(c => (
+              <div key={c.uid} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#1a1a24', borderRadius: 6, border: '1px solid #2a2a38' }}>
+                <div>
+                  <span style={{ color: '#f1f1f5', fontSize: 13 }}>{c.displayName || c.email}</span>
+                  {c.displayName && <span style={{ color: '#6666a0', fontSize: 11, marginLeft: 8 }}>{c.email}</span>}
+                </div>
+                {isOwner && (
+                  <button
+                    onClick={() => handleRemove(c.uid)}
+                    disabled={saving}
+                    style={{ background: 'rgba(239,68,68,0.08)', border: 'none', borderRadius: 6, color: '#ef4444', fontSize: 11, padding: '3px 10px', cursor: 'pointer' }}
+                  >Quitar</button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {isOwner && (
+          loadingAdmins ? (
+            <p style={{ color: '#6666a0', fontSize: 12, margin: 0 }}>Cargando admins...</p>
+          ) : admins.length === 0 ? (
+            <p style={{ color: '#6666a0', fontSize: 12, margin: 0 }}>No hay otros admins disponibles.</p>
+          ) : available.length === 0 ? (
+            <p style={{ color: '#6666a0', fontSize: 12, margin: 0 }}>Todos los admins ya son colaboradores.</p>
+          ) : (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <select
+                value={selectedUid}
+                onChange={e => setSelectedUid(e.target.value)}
+                style={{ flex: 1, background: '#0f0f13', border: '1px solid #2a2a38', borderRadius: 6, padding: '7px 10px', color: selectedUid ? '#f1f1f5' : '#6666a0', fontSize: 13, outline: 'none', cursor: 'pointer' }}
+              >
+                <option value="">— Seleccionar admin</option>
+                {available.map(a => (
+                  <option key={a.uid} value={a.uid}>{a.displayName || a.email}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleAdd}
+                disabled={!selectedUid || saving}
+                style={{
+                  background: selectedUid ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${selectedUid ? 'rgba(249,115,22,0.3)' : '#2a2a38'}`,
+                  borderRadius: 6, color: selectedUid ? '#f97316' : '#6666a0',
+                  fontSize: 12, fontWeight: 600, padding: '7px 14px',
+                  cursor: selectedUid && !saving ? 'pointer' : 'default', whiteSpace: 'nowrap',
+                }}
+              >{saving ? '...' : '+ Agregar'}</button>
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function TorneosAdmin() {
+  const { user } = useAuth()
   const [torneos, setTorneos] = useState([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
@@ -741,12 +862,17 @@ export default function TorneosAdmin() {
   const [llaveConfirm, setLlaveConfirm] = useState(null)
   const [generatingLlave, setGeneratingLlave] = useState(false)
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { if (user) load() }, [user?.uid])
 
   async function load() {
     setLoading(true)
     const snap = await getDocs(query(collection(db, 'torneos'), orderBy('createdAt', 'desc')))
-    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    const all = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    const list = all.filter(t =>
+      !t.ownerUid ||
+      t.ownerUid === user?.uid ||
+      (t.colaboradores || []).some(c => c.uid === user?.uid)
+    )
     setTorneos(list)
     setSelected(prev => prev ? (list.find(t => t.id === prev.id) ?? null) : null)
     setLoading(false)
@@ -837,7 +963,7 @@ export default function TorneosAdmin() {
                   <span style={{ padding: '3px 10px', borderRadius: 20, background: `${col}18`, border: `1px solid ${col}40`, color: col, fontSize: 12, fontWeight: 600 }}>{t.categoriaName}</span>
                   <span className="ta-meta-text">{sexoLabel}</span>
                   {t.modalidadTorneo === 'americano' && <span className="ta-americano-badge">Americano</span>}
-                  {t.fechaInicio && <span className="ta-meta-text">📅 {t.fechaInicio}</span>}
+                  {t.fechaInicio && <span className="ta-meta-text">📅 {t.fechaInicio}{t.fechaFin ? ` → ${t.fechaFin}` : ''}</span>}
                   {t.costoPorJugador > 0 && <span className="ta-meta-text">💰 ${Number(t.costoPorJugador).toLocaleString()} / jugador</span>}
                 </div>
               </div>
@@ -894,6 +1020,13 @@ export default function TorneosAdmin() {
                   </button>
                 )}
               </div>
+
+              <ColaboradoresSection
+                torneo={t}
+                currentUserUid={user?.uid}
+                isOwner={!t.ownerUid || t.ownerUid === user?.uid}
+                onUpdate={load}
+              />
 
               <div className="ta-danger-zone">
                 <div className="ta-section-heading">Zona de peligro</div>
