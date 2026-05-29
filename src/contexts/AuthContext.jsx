@@ -21,18 +21,20 @@ export function AuthProvider({ children }) {
     return onAuthStateChanged(auth, async (u) => {
       if (u) {
         const email       = u.email?.toLowerCase()
-        const masterCheck = MASTER_EMAILS.includes(email)
-        const envAdmin    = ADMIN_EMAILS.includes(email)
+        const masterByEnv = MASTER_EMAILS.includes(email)
+        const adminByEnv  = ADMIN_EMAILS.includes(email)
 
-        if (masterCheck || envAdmin) {
-          setIsAdmin(true)
-          setIsMaster(masterCheck)
-        } else {
+        let firestoreRol = null
+        try {
           const snap = await getDoc(doc(db, 'users', u.uid))
-          const rol  = snap.exists() ? snap.data().rol : 'viewer'
-          setIsAdmin(rol === 'admin' || rol === 'master')
-          setIsMaster(rol === 'master')
-        }
+          if (snap.exists()) firestoreRol = snap.data().rol
+        } catch {}
+
+        const master = masterByEnv || firestoreRol === 'master'
+        const admin  = master || adminByEnv || firestoreRol === 'admin'
+
+        setIsAdmin(admin)
+        setIsMaster(master)
         setUser(u)
       } else {
         setUser(null)
