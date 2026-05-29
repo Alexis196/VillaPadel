@@ -30,3 +30,16 @@
 .li-google-btn:hover:not(:disabled) { border-color: #4a4a5a; }
 .li-google-icon { flex-shrink: 0; }
 .li-error { margin-top: 16px; padding: 10px 14px; background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); border-radius: 8px; color: #ef4444; font-size: 13px; text-align: left; }
+
+/* Request access link */
+.li-request-link-wrap { margin-top: 20px; text-align: center; }
+.li-request-link { background: none; border: none; color: #6666a0; font-size: 13px; cursor: pointer; padding: 4px 8px; transition: color 0.15s; }
+.li-request-link:hover { color: #f97316; }
+
+/* Back / cancel button */
+.li-back-btn { width: 100%; padding: 10px 20px; border-radius: 10px; border: 1px solid #2a2a38; background: transparent; color: #9999b0; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.li-back-btn:hover:not(:disabled) { border-color: #4a4a5a; color: #f1f1f5; }
+
+/* Success state */
+.li-req-success { text-align: center; padding: 8px 0; }
+.li-req-success-icon { width: 52px; height: 52px; border-radius: 50%; background: rgba(74,222,128,0.12); border: 1px solid rgba(74,222,128,0.3); display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; color: #4ade80; font-size: 22px; font-weight: 700; }
