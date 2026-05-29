@@ -126,7 +126,7 @@ export default function Navbar() {
             {user ? (
               <UserMenu user={user} isAdmin={isAdmin} />
             ) : (
-              <button className="nav-btn-login" onClick={() => navigate('/login')}>Admin</button>
+              <button className="nav-btn-login" onClick={() => navigate('/login')}>Iniciar sesión</button>
             )}
           </div>
         </div>

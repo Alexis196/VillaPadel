@@ -1,17 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { signOutUser } from '../../firebase/auth'
+import { getSolicitudes } from '../../firebase/torneoService'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import TorneosAdmin from './TorneosAdmin'
 import DuplasAdmin from './DuplasAdmin'
 import PartidosAdmin from './PartidosAdmin'
 import JugadoresAdmin from './JugadoresAdmin'
 import DocumentosAdmin from './DocumentosAdmin'
+import SolicitudesAdmin from './SolicitudesAdmin'
 import Logo from '../../assets/nuevologo.png'
 import './AdminLayout.css'
 
-const SECTIONS = [
+const BASE_SECTIONS = [
   { id: 'torneos',    icon: '🏆', label: 'Torneos',       component: TorneosAdmin },
   { id: 'duplas',     icon: '👥', label: 'Duplas',         component: DuplasAdmin },
   { id: 'partidos',   icon: '📅', label: 'Partidos',       component: PartidosAdmin },
@@ -23,7 +25,17 @@ export default function AdminLayout() {
   const [active, setActive] = useState('torneos')
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
-  const { user } = useAuth()
+  const [pendingCount, setPendingCount] = useState(0)
+  const { user, isMaster } = useAuth()
+
+  const SECTIONS = isMaster
+    ? [...BASE_SECTIONS, { id: 'solicitudes', icon: '📬', label: 'Solicitudes', component: SolicitudesAdmin }]
+    : BASE_SECTIONS
+
+  useEffect(() => {
+    if (!isMaster) return
+    getSolicitudes().then(list => setPendingCount(list.filter(s => s.status === 'pendiente').length))
+  }, [isMaster])
   const navigate = useNavigate()
   const isMobile = useIsMobile()
 
@@ -53,6 +65,11 @@ export default function AdminLayout() {
       >
         <span style={{ fontSize: 16 }}>{section.icon}</span>
         {full && section.label}
+        {full && section.id === 'solicitudes' && pendingCount > 0 && (
+          <span style={{ marginLeft: 'auto', background: '#f97316', color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 10, fontWeight: 700 }}>
+            {pendingCount}
+          </span>
+        )}
       </button>
     )
   }
@@ -140,7 +157,10 @@ export default function AdminLayout() {
                     </div>
                   )}
                   <div className="al-user-info">
-                    <div className="al-user-name">{user.displayName}</div>
+                    <div className="al-user-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {user.displayName}
+                      {isMaster && <span style={{ background: 'rgba(249,115,22,0.2)', color: '#f97316', borderRadius: 6, padding: '1px 6px', fontSize: 9, fontWeight: 700, letterSpacing: '0.05em' }}>MASTER</span>}
+                    </div>
                     <div className="al-user-email">{user.email}</div>
                   </div>
                 </div>
@@ -206,11 +226,14 @@ export default function AdminLayout() {
               >
                 <span style={{ fontSize: 17 }}>{s.icon}</span>
                 {s.label}
+                {s.id === 'solicitudes' && pendingCount > 0 && (
+                  <span style={{ marginLeft: 'auto', background: '#f97316', color: '#fff', borderRadius: 10, padding: '1px 7px', fontSize: 10, fontWeight: 700 }}>{pendingCount}</span>
+                )}
               </button>
             ))}
           </nav>
           <div className="al-drawer-footer al-glass-bt">
-            {user && <div className="al-drawer-email">{user.email}</div>}
+            {user && <div className="al-drawer-email">{isMaster ? '⭐ ' : ''}{user.email}</div>}
             <button onClick={handleLogout} className="al-drawer-logout">↩ Cerrar sesión</button>
           </div>
         </div>

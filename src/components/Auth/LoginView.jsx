@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import emailjs from '@emailjs/browser'
-import { signInWithGoogle, signInWithEmail } from '../../firebase/auth'
+import { signInWithGoogle, signInWithEmail, sendPasswordReset } from '../../firebase/auth'
+import { createSolicitud } from '../../firebase/torneoService'
 import Logo from '../../assets/villapadel-icon.png'
 import './LoginView.css'
 
@@ -9,14 +10,17 @@ const EJS_SERVICE  = import.meta.env.VITE_EMAILJS_SERVICE_ID
 const EJS_TEMPLATE = import.meta.env.VITE_EMAILJS_TEMPLATE_ID
 const EJS_KEY      = import.meta.env.VITE_EMAILJS_PUBLIC_KEY
 
+// 'login' | 'request' | 'forgot'
 export default function LoginView() {
+  const [screen, setScreen]     = useState('login')
   const [email, setEmail]       = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
-  const [showRequest, setShowRequest] = useState(false)
   const navigate = useNavigate()
+
+  function goTo(s) { setError(''); setScreen(s) }
 
   async function handleEmail(e) {
     e.preventDefault()
@@ -68,9 +72,10 @@ export default function LoginView() {
           <img src={Logo} alt="VillaPadel" className="li-logo-img" />
         </div>
 
-        {showRequest ? (
-          <RequestAccessForm onBack={() => setShowRequest(false)} />
-        ) : (
+        {screen === 'request' && <RequestAccessForm onBack={() => goTo('login')} />}
+        {screen === 'forgot'  && <ForgotPasswordForm onBack={() => goTo('login')} prefillEmail={email} />}
+
+        {screen === 'login' && (
           <>
             <h1 className="li-title">Panel de Administración</h1>
             <p className="li-desc">Acceso exclusivo para administradores de VillaPadel</p>
@@ -106,6 +111,9 @@ export default function LoginView() {
                     {showPass ? '🙈' : '👁'}
                   </button>
                 </div>
+                <button type="button" className="li-forgot-link" onClick={() => goTo('forgot')}>
+                  ¿Olvidaste tu contraseña?
+                </button>
               </div>
 
               <button
@@ -150,7 +158,7 @@ export default function LoginView() {
             {error && <div className="li-error">{error}</div>}
 
             <div className="li-request-link-wrap">
-              <button className="li-request-link" onClick={() => { setError(''); setShowRequest(true) }}>
+              <button className="li-request-link" onClick={() => goTo('request')}>
                 ¿No tenés acceso? Solicitarlo
               </button>
             </div>
@@ -162,10 +170,10 @@ export default function LoginView() {
 }
 
 function RequestAccessForm({ onBack }) {
-  const [form, setForm] = useState({ nombre: '', apellido: '', email: '' })
-  const [sending, setSending]   = useState(false)
-  const [sent, setSent]         = useState(false)
-  const [error, setError]       = useState('')
+  const [form, setForm]     = useState({ nombre: '', apellido: '', email: '' })
+  const [sending, setSending] = useState(false)
+  const [sent, setSent]     = useState(false)
+  const [error, setError]   = useState('')
 
   function handleChange(e) {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }))
@@ -180,18 +188,16 @@ function RequestAccessForm({ onBack }) {
     setSending(true)
     setError('')
     try {
-      await emailjs.send(
-        EJS_SERVICE,
-        EJS_TEMPLATE,
-        {
+      await Promise.all([
+        createSolicitud({ nombre: form.nombre.trim(), apellido: form.apellido.trim(), email: form.email.trim() }),
+        emailjs.send(EJS_SERVICE, EJS_TEMPLATE, {
           nombre:            form.nombre.trim(),
           apellido:          form.apellido.trim(),
           email_solicitante: form.email.trim(),
-          name:              form.nombre.trim(),  // usado en From Name del template
-          email:             form.email.trim(),   // usado en Reply To del template
-        },
-        EJS_KEY,
-      )
+          name:              form.nombre.trim(),
+          email:             form.email.trim(),
+        }, EJS_KEY),
+      ])
       setSent(true)
     } catch {
       setError('No se pudo enviar la solicitud. Intentá de nuevo más tarde.')
@@ -205,9 +211,13 @@ function RequestAccessForm({ onBack }) {
       <div className="li-req-success">
         <div className="li-req-success-icon">✓</div>
         <h2 className="li-title" style={{ fontSize: 18, marginBottom: 8 }}>Solicitud enviada</h2>
-        <p className="li-desc" style={{ marginBottom: 24 }}>
-          Tu solicitud fue enviada correctamente. El administrador se pondrá en contacto con vos.
+        <p className="li-desc" style={{ marginBottom: 16 }}>
+          Tu solicitud fue enviada correctamente. El administrador la revisará a la brevedad.
         </p>
+        <div className="li-spam-note">
+          <span className="li-spam-icon">📧</span>
+          <span>Si tu solicitud es aprobada, recibirás un email para crear tu contraseña. Revisá también la carpeta de <strong>spam o correo no deseado</strong> por si no aparece en bandeja de entrada.</span>
+        </div>
         <button className="li-back-btn" onClick={onBack}>Volver al inicio de sesión</button>
       </div>
     )
@@ -221,55 +231,99 @@ function RequestAccessForm({ onBack }) {
       <form onSubmit={handleSubmit} className="li-form">
         <div className="li-field">
           <label className="li-label">NOMBRE</label>
-          <input
-            name="nombre"
-            type="text"
-            value={form.nombre}
-            onChange={handleChange}
-            placeholder="Juan"
-            disabled={sending}
-            className="li-inp"
-          />
+          <input name="nombre" type="text" value={form.nombre} onChange={handleChange}
+            placeholder="Juan" disabled={sending} className="li-inp" />
         </div>
-
         <div className="li-field">
           <label className="li-label">APELLIDO</label>
-          <input
-            name="apellido"
-            type="text"
-            value={form.apellido}
-            onChange={handleChange}
-            placeholder="García"
-            disabled={sending}
-            className="li-inp"
-          />
+          <input name="apellido" type="text" value={form.apellido} onChange={handleChange}
+            placeholder="García" disabled={sending} className="li-inp" />
         </div>
-
         <div className="li-field-last">
           <label className="li-label">CORREO ELECTRÓNICO</label>
-          <input
-            name="email"
-            type="email"
-            value={form.email}
-            onChange={handleChange}
-            placeholder="juan@email.com"
-            disabled={sending}
-            className="li-inp"
-          />
+          <input name="email" type="email" value={form.email} onChange={handleChange}
+            placeholder="juan@email.com" disabled={sending} className="li-inp" />
         </div>
 
-        <button
-          type="submit"
-          disabled={sending}
-          style={{
-            width: '100%', padding: '12px 20px', borderRadius: 10, border: 'none',
-            background: sending ? '#2a2a38' : '#f97316',
-            color: sending ? '#9999b0' : '#fff',
-            fontSize: 15, fontWeight: 700, cursor: sending ? 'wait' : 'pointer',
-            transition: 'all 0.15s', marginBottom: 12,
-          }}
-        >
+        <button type="submit" disabled={sending} style={{
+          width: '100%', padding: '12px 20px', borderRadius: 10, border: 'none',
+          background: sending ? '#2a2a38' : '#f97316',
+          color: sending ? '#9999b0' : '#fff',
+          fontSize: 15, fontWeight: 700, cursor: sending ? 'wait' : 'pointer',
+          transition: 'all 0.15s', marginBottom: 12,
+        }}>
           {sending ? 'Enviando...' : 'Enviar solicitud'}
+        </button>
+
+        <button type="button" className="li-back-btn" onClick={onBack} disabled={sending}>
+          Cancelar
+        </button>
+      </form>
+
+      {error && <div className="li-error">{error}</div>}
+    </>
+  )
+}
+
+function ForgotPasswordForm({ onBack, prefillEmail }) {
+  const [email, setEmail]   = useState(prefillEmail || '')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent]     = useState(false)
+  const [error, setError]   = useState('')
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!email.trim()) { setError('Ingresá tu email.'); return }
+    setSending(true)
+    setError('')
+    try {
+      await sendPasswordReset(email.trim())
+      setSent(true)
+    } catch (err) {
+      const code = err?.code || ''
+      if (code === 'auth/user-not-found' || code === 'auth/invalid-email') {
+        setError('No existe una cuenta con ese email.')
+      } else {
+        setError('No se pudo enviar el email. Intentá de nuevo.')
+      }
+    } finally {
+      setSending(false)
+    }
+  }
+
+  if (sent) {
+    return (
+      <div className="li-req-success">
+        <div className="li-req-success-icon">✉</div>
+        <h2 className="li-title" style={{ fontSize: 18, marginBottom: 8 }}>Email enviado</h2>
+        <p className="li-desc" style={{ marginBottom: 24 }}>
+          Revisá tu bandeja de entrada. Te enviamos un link para restablecer tu contraseña.
+        </p>
+        <button className="li-back-btn" onClick={onBack}>Volver al inicio de sesión</button>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <h1 className="li-title">Restablecer contraseña</h1>
+      <p className="li-desc">Te enviamos un link para crear una nueva contraseña.</p>
+
+      <form onSubmit={handleSubmit} className="li-form">
+        <div className="li-field-last">
+          <label className="li-label">EMAIL</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+            placeholder="tu@email.com" autoComplete="email" disabled={sending} className="li-inp" />
+        </div>
+
+        <button type="submit" disabled={sending} style={{
+          width: '100%', padding: '12px 20px', borderRadius: 10, border: 'none',
+          background: sending ? '#2a2a38' : '#f97316',
+          color: sending ? '#9999b0' : '#fff',
+          fontSize: 15, fontWeight: 700, cursor: sending ? 'wait' : 'pointer',
+          transition: 'all 0.15s', marginBottom: 12,
+        }}>
+          {sending ? 'Enviando...' : 'Enviar link'}
         </button>
 
         <button type="button" className="li-back-btn" onClick={onBack} disabled={sending}>

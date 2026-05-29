@@ -848,7 +848,7 @@ function ColaboradoresSection({ torneo, currentUserUid, isOwner, onUpdate }) {
 }
 
 export default function TorneosAdmin() {
-  const { user } = useAuth()
+  const { user, isMaster } = useAuth()
   const [torneos, setTorneos] = useState([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
@@ -862,13 +862,13 @@ export default function TorneosAdmin() {
   const [llaveConfirm, setLlaveConfirm] = useState(null)
   const [generatingLlave, setGeneratingLlave] = useState(false)
 
-  useEffect(() => { if (user) load() }, [user?.uid])
+  useEffect(() => { if (user) load() }, [user?.uid, isMaster])
 
   async function load() {
     setLoading(true)
     const snap = await getDocs(query(collection(db, 'torneos'), orderBy('createdAt', 'desc')))
     const all = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    const list = all.filter(t =>
+    const list = isMaster ? all : all.filter(t =>
       !t.ownerUid ||
       t.ownerUid === user?.uid ||
       (t.colaboradores || []).some(c => c.uid === user?.uid)
@@ -1024,7 +1024,7 @@ export default function TorneosAdmin() {
               <ColaboradoresSection
                 torneo={t}
                 currentUserUid={user?.uid}
-                isOwner={!t.ownerUid || t.ownerUid === user?.uid}
+                isOwner={isMaster || !t.ownerUid || t.ownerUid === user?.uid}
                 onUpdate={load}
               />
 

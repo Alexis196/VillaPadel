@@ -1,8 +1,9 @@
-import { db } from './config'
+import { db, auth } from './config'
 import {
-  collection, doc, addDoc, setDoc, getDocs, getDoc, deleteDoc,
-  writeBatch, serverTimestamp, query, orderBy,
+  collection, doc, addDoc, setDoc, updateDoc, getDocs, getDoc, deleteDoc,
+  writeBatch, serverTimestamp, query, orderBy, where, arrayUnion, arrayRemove,
 } from 'firebase/firestore'
+import { sendPasswordResetEmail } from 'firebase/auth'
 
 // ─── American tournament set winner ──────────────────────────────────────────
 // First to 9 games; if tied at 8-8, win by 2
@@ -481,4 +482,103 @@ export function computeStandings(partidos, duplas) {
   return Object.values(stats).sort(
     (a, b) => b.pts - a.pts || b.setsF - a.setsF || (b.gamesF - b.gamesC) - (a.gamesF - a.gamesC)
   )
+}
+
+// ─── Solicitudes de acceso admin ──────────────────────────────────────────────
+
+export async function createSolicitud({ nombre, apellido, email }) {
+  return addDoc(collection(db, 'solicitudes'), {
+    nombre, apellido, email,
+    status: 'pendiente',
+    createdAt: serverTimestamp(),
+  })
+}
+
+export async function getSolicitudes() {
+  const snap = await getDocs(query(collection(db, 'solicitudes'), orderBy('createdAt', 'desc')))
+  return snap.docs.map(d => ({ id: d.id, ...d.data() }))
+}
+
+async function createAuthUserViaRest(email) {
+  const apiKey = import.meta.env.VITE_FIREBASE_API_KEY
+  const tempPassword = (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(-16)) + 'A1!'
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password: tempPassword, returnSecureToken: false }),
+    }
+  )
+  const data = await res.json()
+  if (data.error) throw new Error(data.error.message)
+  return data.localId
+}
+
+export async function approveSolicitud(solicitudId, { email, nombre, apellido }) {
+  const emailLower = email.toLowerCase()
+
+  // 1. Marcar solicitud como aprobada
+  await setDoc(doc(db, 'solicitudes', solicitudId), { status: 'aprobado', reviewedAt: serverTimestamp() }, { merge: true })
+  // 2. Agregar a config/admins
+  await setDoc(doc(db, 'config', 'admins'), { emails: arrayUnion(emailLower) }, { merge: true })
+
+  // 3. Buscar si ya existe en users
+  const usersSnap = await getDocs(query(collection(db, 'users'), where('email', '==', emailLower)))
+  if (!usersSnap.empty) {
+    await updateDoc(usersSnap.docs[0].ref, { rol: 'admin' })
+    return
+  }
+
+  // 4. No existe → crear cuenta en Firebase Auth y doc en Firestore
+  try {
+    const uid = await createAuthUserViaRest(emailLower)
+    await setDoc(doc(db, 'users', uid), {
+      email: emailLower,
+      displayName: `${nombre} ${apellido}`.trim(),
+      photoURL: null,
+      rol: 'admin',
+      createdAt: new Date(),
+    })
+    // Enviar email para que el usuario establezca su contraseña
+    await sendPasswordResetEmail(auth, emailLower)
+  } catch (err) {
+    if (err.message !== 'EMAIL_EXISTS') throw err
+    // Si ya existe en Auth pero no en Firestore, config/admins lo resuelve al iniciar sesión
+  }
+}
+
+export async function rejectSolicitud(solicitudId) {
+  await setDoc(doc(db, 'solicitudes', solicitudId), { status: 'rechazado', reviewedAt: serverTimestamp() }, { merge: true })
+}
+
+export async function updateSolicitud(solicitudId, { nombre, apellido, email, status }) {
+  await setDoc(doc(db, 'solicitudes', solicitudId), { nombre, apellido, email, status }, { merge: true })
+}
+
+export async function deleteSolicitud(solicitudId) {
+  await deleteDoc(doc(db, 'solicitudes', solicitudId))
+}
+
+// ─── Gestión de admins ────────────────────────────────────────────────────────
+
+export async function getAdmins() {
+  const [usersSnap, configSnap] = await Promise.all([
+    getDocs(query(collection(db, 'users'), where('rol', '==', 'admin'))),
+    getDoc(doc(db, 'config', 'admins')),
+  ])
+
+  const activeAdmins = usersSnap.docs.map(d => ({ uid: d.id, ...d.data(), pending: false }))
+  const activeEmails = new Set(activeAdmins.map(u => u.email?.toLowerCase()))
+
+  const preApproved = (configSnap.exists() ? configSnap.data().emails || [] : [])
+    .filter(email => !activeEmails.has(email.toLowerCase()))
+    .map(email => ({ uid: null, email, displayName: null, photoURL: null, pending: true }))
+
+  return [...activeAdmins, ...preApproved]
+}
+
+export async function revokeAdmin(uid, email) {
+  if (uid) await updateDoc(doc(db, 'users', uid), { rol: 'viewer' })
+  await setDoc(doc(db, 'config', 'admins'), { emails: arrayRemove(email.toLowerCase()) }, { merge: true })
 }
