@@ -34,9 +34,12 @@ export default function JugadoresAdmin() {
   const [search, setSearch] = useState('')
   const [filterCat, setFilterCat] = useState('all')
   const [filterSexo, setFilterSexo] = useState('all')
+  const [filterLocalidad, setFilterLocalidad] = useState('all')
   const [form, setForm] = useState(blankForm())
   const [editId, setEditId] = useState(null)
+  const [editForm, setEditForm] = useState(blankForm())
   const [saving, setSaving] = useState(false)
+  const [savingEdit, setSavingEdit] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [pageSize, setPageSize] = useState(10)
   const [page, setPage] = useState(1)
@@ -53,6 +56,11 @@ export default function JugadoresAdmin() {
 
   const CAT_PREFIX = { 'cat-1ra': '1ra', 'cat-2da': '2da', 'cat-3ra': '3ra', 'cat-4ta': '4ta', 'cat-5ta': '5ta', 'cat-6ta': '6ta', 'cat-7ma': '7ma', 'cat-8va': '8va' }
 
+  const localidadOptions = useMemo(() => {
+    const set = new Set(players.map(p => p.localidad).filter(Boolean))
+    return [...set].sort((a, b) => a.localeCompare(b))
+  }, [players])
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     const catPrefix = filterCat !== 'all' ? CAT_PREFIX[filterCat] : null
@@ -61,10 +69,11 @@ export default function JugadoresAdmin() {
         if (q && !p.name?.toLowerCase().includes(q) && !p.categoryName?.toLowerCase().includes(q)) return false
         if (catPrefix && !p.categoryName?.startsWith(catPrefix)) return false
         if (filterSexo !== 'all' && p.sexo !== filterSexo) return false
+        if (filterLocalidad !== 'all' && p.localidad !== filterLocalidad) return false
         return true
       })
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-  }, [players, search, filterCat, filterSexo])
+  }, [players, search, filterCat, filterSexo, filterLocalidad])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -74,6 +83,7 @@ export default function JugadoresAdmin() {
   function handlePageSize(val) { setPageSize(val); setPage(1) }
   function handleFilterCat(val) { setFilterCat(val); setPage(1) }
   function handleFilterSexo(val) { setFilterSexo(val); setPage(1) }
+  function handleFilterLocalidad(val) { setFilterLocalidad(val); setPage(1) }
 
   async function handleToggleAscenso(p) {
     const next = !p.ascenso
@@ -83,26 +93,30 @@ export default function JugadoresAdmin() {
 
   function startEdit(p) {
     const cat = CAT_OPTIONS.find(c => c.name === p.categoryName) || CAT_OPTIONS[0]
-    setForm({ name: p.name, catId: cat.id, sexo: p.sexo || 'M', localidad: p.localidad || '' })
+    setEditForm({ name: p.name, catId: cat.id, sexo: p.sexo || 'M', localidad: p.localidad || '' })
     setEditId(p.id)
   }
 
-  function cancelEdit() { setForm(blankForm()); setEditId(null) }
+  function cancelEdit() { setEditForm(blankForm()); setEditId(null) }
 
-  async function handleSave() {
+  async function handleAdd() {
     if (!form.name.trim()) return
     const cat = CAT_OPTIONS.find(c => c.id === form.catId)
     setSaving(true)
-    if (editId) {
-      await updateJugador(editId, { name: form.name.trim(), categoryName: cat.name, categoryColor: cat.color, categoriaValor: cat.valor, sexo: form.sexo, localidad: form.localidad })
-      setPlayers(prev => prev.map(p => p.id === editId ? { ...p, name: form.name.trim(), categoryName: cat.name, categoryColor: cat.color, categoriaValor: cat.valor, sexo: form.sexo, localidad: form.localidad } : p))
-    } else {
-      await addJugador({ name: form.name.trim(), categoryName: cat.name, categoryColor: cat.color, categoriaValor: cat.valor, sexo: form.sexo, localidad: form.localidad })
-      await load()
-    }
+    await addJugador({ name: form.name.trim(), categoryName: cat.name, categoryColor: cat.color, categoriaValor: cat.valor, sexo: form.sexo, localidad: form.localidad })
+    await load()
     setSaving(false)
     setForm(blankForm())
-    setEditId(null)
+  }
+
+  async function handleSaveEdit() {
+    if (!editForm.name.trim()) return
+    const cat = CAT_OPTIONS.find(c => c.id === editForm.catId)
+    setSavingEdit(true)
+    await updateJugador(editId, { name: editForm.name.trim(), categoryName: cat.name, categoryColor: cat.color, categoriaValor: cat.valor, sexo: editForm.sexo, localidad: editForm.localidad })
+    setPlayers(prev => prev.map(p => p.id === editId ? { ...p, name: editForm.name.trim(), categoryName: cat.name, categoryColor: cat.color, categoriaValor: cat.valor, sexo: editForm.sexo, localidad: editForm.localidad } : p))
+    setSavingEdit(false)
+    cancelEdit()
   }
 
   async function handleDelete(id) {
@@ -112,6 +126,7 @@ export default function JugadoresAdmin() {
   }
 
   const cat = CAT_OPTIONS.find(c => c.id === form.catId) || CAT_OPTIONS[0]
+  const editCat = CAT_OPTIONS.find(c => c.id === editForm.catId) || CAT_OPTIONS[0]
 
   return (
     <div>
@@ -120,21 +135,19 @@ export default function JugadoresAdmin() {
         <p className="ja-page-desc">Categorización de jugadores</p>
       </div>
 
-      {/* Add / Edit form */}
+      {/* Add form */}
       <div className="ja-form-panel">
-        <div className="ja-form-heading">
-          {editId ? '✎ Editar jugador' : '+ Nuevo jugador'}
-        </div>
+        <div className="ja-form-heading">+ Nuevo jugador</div>
         <div className="ja-form-row">
           <div style={{ flex: 1, minWidth: 160 }}>
             <div className="ja-field-label">NOMBRE</div>
             <input placeholder="Nombre y apellido" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
-              onKeyDown={e => e.key === 'Enter' && handleSave()} className="ja-inp" />
+              onKeyDown={e => e.key === 'Enter' && handleAdd()} className="ja-inp" />
           </div>
           <div style={{ minWidth: 140 }}>
             <div className="ja-field-label">LOCALIDAD</div>
             <input placeholder="Ciudad / Club" value={form.localidad} onChange={e => setForm(p => ({ ...p, localidad: e.target.value }))}
-              onKeyDown={e => e.key === 'Enter' && handleSave()} className="ja-inp" />
+              onKeyDown={e => e.key === 'Enter' && handleAdd()} className="ja-inp" />
           </div>
           <div style={{ minWidth: 170 }}>
             <div className="ja-field-label">CATEGORÍA</div>
@@ -161,9 +174,8 @@ export default function JugadoresAdmin() {
             <span className="ja-cat-label" style={{ color: cat.color }}>Nv. {cat.valor}</span>
           </div>
           <div className="ja-form-actions">
-            {editId && <button onClick={cancelEdit} className="ja-btn-cancel">Cancelar</button>}
-            <button onClick={handleSave} disabled={saving || !form.name.trim()} className="ja-btn-save">
-              {saving ? '...' : editId ? 'Guardar' : '+ Agregar'}
+            <button onClick={handleAdd} disabled={saving || !form.name.trim()} className="ja-btn-save">
+              {saving ? '...' : '+ Agregar'}
             </button>
           </div>
         </div>
@@ -197,6 +209,16 @@ export default function JugadoresAdmin() {
               { value: 'F', label: 'Femenino' },
             ]}
             minWidth={130}
+          />
+          <span className="ja-filter-label">LOCALIDAD</span>
+          <AppSelect
+            value={filterLocalidad}
+            onChange={handleFilterLocalidad}
+            options={[
+              { value: 'all', label: 'Todas' },
+              ...localidadOptions.map(l => ({ value: l, label: l })),
+            ]}
+            minWidth={160}
           />
           <div className="ja-pagesize-group">
             <span className="ja-pagesize-label">Ver</span>
@@ -323,6 +345,58 @@ export default function JugadoresAdmin() {
           </div>
           <PaginationBar safePage={safePage} totalPages={totalPages} setPage={setPage} filtered={filtered} />
         </>
+      )}
+
+      {editId && (
+        <div className="ja-modal-overlay" onClick={e => e.target === e.currentTarget && cancelEdit()}>
+          <div className="ja-edit-modal">
+            <div className="ja-form-heading">✎ Editar jugador</div>
+            <div className="ja-edit-modal-body">
+              <div>
+                <div className="ja-field-label">NOMBRE</div>
+                <input placeholder="Nombre y apellido" value={editForm.name} onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && handleSaveEdit()} className="ja-inp" autoFocus />
+              </div>
+              <div>
+                <div className="ja-field-label">LOCALIDAD</div>
+                <input placeholder="Ciudad / Club" value={editForm.localidad} onChange={e => setEditForm(p => ({ ...p, localidad: e.target.value }))}
+                  onKeyDown={e => e.key === 'Enter' && handleSaveEdit()} className="ja-inp" />
+              </div>
+              <div>
+                <div className="ja-field-label">CATEGORÍA</div>
+                <AppSelect
+                  value={editForm.catId}
+                  onChange={v => setEditForm(p => ({ ...p, catId: v }))}
+                  options={CAT_OPTIONS.map(c => ({ value: c.id, label: c.name }))}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div className="ja-field-label">SEXO</div>
+                  <div className="ja-sexo-group">
+                    {[{ v: 'M', label: 'Masc.', col: '#3b82f6' }, { v: 'F', label: 'Fem.', col: '#ec4899' }].map(({ v, label, col }) => (
+                      <button key={v} type="button" onClick={() => setEditForm(p => ({ ...p, sexo: v }))}
+                        className="ja-sexo-btn"
+                        style={{ background: editForm.sexo === v ? col : 'transparent', color: editForm.sexo === v ? '#fff' : '#9999b0' }}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="ja-cat-preview" style={{ background: `${editCat.color}15`, border: `1px solid ${editCat.color}30` }}>
+                  <span className="ja-cat-dot" style={{ background: editCat.color }} />
+                  <span className="ja-cat-label" style={{ color: editCat.color }}>Nv. {editCat.valor}</span>
+                </div>
+              </div>
+            </div>
+            <div className="ja-modal-actions" style={{ marginTop: 22 }}>
+              <button onClick={cancelEdit} className="ja-modal-cancel">Cancelar</button>
+              <button onClick={handleSaveEdit} disabled={savingEdit || !editForm.name.trim()} className="ja-btn-save">
+                {savingEdit ? '...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {confirmDelete && (

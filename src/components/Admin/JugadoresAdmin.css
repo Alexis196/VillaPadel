@@ -161,3 +161,7 @@
 .ja-modal-actions { display: flex; gap: 10px; justify-content: center; }
 .ja-modal-cancel { background: transparent; border: 1px solid #2a2a38; border-radius: 8px; color: #9999b0; font-size: 13px; padding: 8px 18px; cursor: pointer; }
 .ja-modal-confirm { background: #ef4444; color: #fff; border: none; border-radius: 8px; padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+/* Edit modal */
+.ja-edit-modal { background: #1a1a22; border: 1px solid #2a2a38; border-radius: 12px; padding: 24px; width: 100%; max-width: 420px; }
+.ja-edit-modal-body { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 4px; }

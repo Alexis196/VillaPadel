@@ -23,6 +23,11 @@
 }
 .td-tab-icon { font-size: 14px; }
 .td-content { flex: 1; }
+.td-tab-badge {
+  background: #f97316; color: #fff; font-size: 10px; font-weight: 700;
+  border-radius: 20px; padding: 1px 6px; line-height: 1.4;
+}
+.td-tab-badge-mobile { position: absolute; top: -4px; right: -10px; padding: 0 4px; font-size: 9px; }
 
 /* Mobile bottom nav */
 .td-bottom-nav {

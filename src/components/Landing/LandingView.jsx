@@ -104,6 +104,11 @@ function MatchRow({ match, last }) {
   )
 }
 
+function formatFechaInicio(fecha) {
+  if (!fecha) return ''
+  return new Date(fecha + 'T12:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
+}
+
 export default function LandingView() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
@@ -117,6 +122,12 @@ export default function LandingView() {
     const fin = partidos.filter(p => p.estado === 'Finalizado' || p.estado === 'W.O.')
     return [...live, ...fin].slice(0, 5)
   }, [partidos])
+
+  const proximosTorneos = useMemo(() => {
+    return torneos
+      .filter(t => t.estado === 'Inscripción')
+      .sort((a, b) => (a.fechaInicio || '').localeCompare(b.fechaInicio || ''))
+  }, [torneos])
 
   return (
     <div>
@@ -188,11 +199,38 @@ export default function LandingView() {
           </div>
         </div>
 
-        <div className="lv-cta">
+        <div className="lv-cta lv-cta-buttons">
           <button className="btn-primary" onClick={() => navigate('/torneos')} style={{ padding: isMobile ? '13px 36px' : undefined }}>
-            Ver torneos →
+            Ver torneos
+          </button>
+          <button className="btn-ghost" onClick={() => navigate('/categorizacion')} style={{ padding: isMobile ? '13px 28px' : '14px 32px', fontSize: 14 }}>
+            Ver categorización
           </button>
         </div>
+
+        {proximosTorneos.length > 0 && (
+          <div className="match-section lv-match-section animate-fadein" style={{ marginBottom: 32 }}>
+            <div className="match-section-header">
+              <div className="lv-match-header-inner">
+                <span className="lv-recent-title">Próximamente</span>
+              </div>
+            </div>
+
+            <div style={{ padding: '2px 0 4px' }}>
+              {proximosTorneos.map((t, i) => (
+                <button
+                  key={t.id}
+                  className="lv-proximo-row"
+                  onClick={() => navigate(`/torneos/${t.id}`)}
+                  style={{ borderBottom: i === proximosTorneos.length - 1 ? 'none' : undefined }}
+                >
+                  <span className="lv-proximo-nombre">{t.nombre}</span>
+                  <span className="badge badge-blue">{formatFechaInicio(t.fechaInicio)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {partidosDestacados.length > 0 && (
           <div className="match-section lv-match-section animate-fadein">

@@ -10,11 +10,13 @@ export function TorneoProvider({ children }) {
   const [zonas, setZonas] = useState([])
   const [partidos, setPartidos] = useState([])
   const [llaves, setLlaves] = useState([])
+  const [buscandoDupla, setBuscandoDupla] = useState([])
   const [loadingTorneos, setLoadingTorneos] = useState(true)
   const [loadingData, setLoadingData] = useState(false)
 
   const unsubPartidosRef = useRef(null)
   const unsubLlavesRef = useRef(null)
+  const unsubBuscandoDuplaRef = useRef(null)
 
   useEffect(() => {
     setLoadingTorneos(true)
@@ -42,11 +44,13 @@ export function TorneoProvider({ children }) {
 
     if (unsubPartidosRef.current) { unsubPartidosRef.current(); unsubPartidosRef.current = null }
     if (unsubLlavesRef.current) { unsubLlavesRef.current(); unsubLlavesRef.current = null }
+    if (unsubBuscandoDuplaRef.current) { unsubBuscandoDuplaRef.current(); unsubBuscandoDuplaRef.current = null }
 
     setLoadingData(true)
     setZonas([])
     setPartidos([])
     setLlaves([])
+    setBuscandoDupla([])
 
     getDocs(query(collection(db, 'torneos', activeTorneoId, 'zonas'), orderBy('orden')))
       .then(snap => setZonas(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
@@ -66,9 +70,15 @@ export function TorneoProvider({ children }) {
       snap => setLlaves(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     )
 
+    unsubBuscandoDuplaRef.current = onSnapshot(
+      query(collection(db, 'torneos', activeTorneoId, 'buscandoDupla'), orderBy('createdAt', 'desc')),
+      snap => setBuscandoDupla(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    )
+
     return () => {
       if (unsubPartidosRef.current) { unsubPartidosRef.current(); unsubPartidosRef.current = null }
       if (unsubLlavesRef.current) { unsubLlavesRef.current(); unsubLlavesRef.current = null }
+      if (unsubBuscandoDuplaRef.current) { unsubBuscandoDuplaRef.current(); unsubBuscandoDuplaRef.current = null }
     }
   }, [activeTorneoId])
 
@@ -83,6 +93,7 @@ export function TorneoProvider({ children }) {
       zonas,
       partidos,
       llaves,
+      buscandoDupla,
       loading: loadingTorneos || loadingData,
       refreshTorneos,
     }}>

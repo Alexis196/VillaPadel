@@ -115,10 +115,15 @@ export async function updateTorneo(id, { nombre, categoriaId, categoriaName, cat
 // ─── Delete tournament and all subcollections ─────────────────────────────────
 export async function deleteTorneo(id) {
   const batch = writeBatch(db)
-  const subcols = ['duplas', 'zonas', 'partidos']
+  const subcols = ['duplas', 'zonas', 'partidos', 'buscandoDupla']
   for (const sub of subcols) {
     const snap = await getDocs(collection(db, 'torneos', id, sub))
     snap.forEach(d => batch.delete(d.ref))
+  }
+  const busquedasSnap = await getDocs(collection(db, 'torneos', id, 'buscandoDupla'))
+  for (const busquedaDoc of busquedasSnap.docs) {
+    const comentariosSnap = await getDocs(collection(busquedaDoc.ref, 'comentarios'))
+    comentariosSnap.forEach(d => batch.delete(d.ref))
   }
   batch.delete(doc(db, 'torneos', id))
   await batch.commit()
@@ -138,6 +143,37 @@ export async function addDupla(torneoId, { jugador1, jugador2, pago1, pago2 }) {
     pago2: { estado: pago2?.estado || 'pendiente', metodo: pago2?.metodo || null, monto: Number(pago2?.monto) || 0 },
     createdAt: serverTimestamp(),
   })
+}
+
+// ─── Buscar dupla (public board — jugadores sueltos buscando pareja) ─────────
+export async function addBusquedaDupla(torneoId, { nombre, apellido, mensaje }) {
+  return addDoc(collection(db, 'torneos', torneoId, 'buscandoDupla'), {
+    nombre: nombre.trim(),
+    apellido: apellido.trim(),
+    mensaje: mensaje?.trim() || '',
+    createdAt: serverTimestamp(),
+  })
+}
+
+export async function deleteBusquedaDupla(torneoId, busquedaId) {
+  const busquedaRef = doc(db, 'torneos', torneoId, 'buscandoDupla', busquedaId)
+  const comentariosSnap = await getDocs(collection(busquedaRef, 'comentarios'))
+  const batch = writeBatch(db)
+  comentariosSnap.forEach(d => batch.delete(d.ref))
+  batch.delete(busquedaRef)
+  await batch.commit()
+}
+
+export async function addComentarioBusqueda(torneoId, busquedaId, { nombre, mensaje }) {
+  await addDoc(collection(db, 'torneos', torneoId, 'buscandoDupla', busquedaId, 'comentarios'), {
+    nombre: nombre.trim(),
+    mensaje: mensaje.trim(),
+    createdAt: serverTimestamp(),
+  })
+}
+
+export async function deleteComentarioBusqueda(torneoId, busquedaId, comentarioId) {
+  await deleteDoc(doc(db, 'torneos', torneoId, 'buscandoDupla', busquedaId, 'comentarios', comentarioId))
 }
 
 // ─── Generate zones + fixture for a tournament ───────────────────────────────
@@ -251,11 +287,22 @@ export async function updateDuplaPago(torneoId, duplaId, { pago1, pago2 }) {
 }
 
 // ─── Player CRUD (categorization) ────────────────────────────────────────────
+function normalizeLocalidad(str) {
+  if (!str) return ''
+  return str
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase()
+    .split(' ')
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}
+
 export async function addJugador({ name, categoryName, categoryColor, categoriaValor, sexo, localidad }) {
   await addDoc(collection(db, 'players'), {
     name, categoryName, categoryColor, categoriaValor: Number(categoriaValor),
     sexo: sexo || 'M', ascenso: false,
-    localidad: localidad?.trim() || '',
+    localidad: normalizeLocalidad(localidad),
     createdAt: serverTimestamp(),
   })
 }
@@ -265,7 +312,7 @@ export async function updateJugador(id, fields) {
   const data = {
     name, categoryName, categoryColor, categoriaValor: Number(categoriaValor),
     sexo: sexo || 'M',
-    localidad: localidad?.trim() || '',
+    localidad: normalizeLocalidad(localidad),
   }
   if (ascenso !== undefined) data.ascenso = ascenso
   await setDoc(doc(db, 'players', id), data, { merge: true })

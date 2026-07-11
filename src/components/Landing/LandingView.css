@@ -7,6 +7,25 @@
 .lv-features-section { margin-bottom: 36px; }
 .lv-features-label { color: #f97316; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 8px; }
 .lv-cta { text-align: center; margin-bottom: 48px; }
+.lv-cta-buttons { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+
+/* Próximamente row */
+.lv-proximo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 12px 22px;
+  border: none;
+  border-bottom: 1px solid rgba(255,255,255,.035);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background .15s ease;
+}
+.lv-proximo-row:hover { background: rgba(255,255,255,.025); }
+.lv-proximo-nombre { color: #fff; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Match section inline override */
 .lv-match-section {

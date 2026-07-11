@@ -7,9 +7,11 @@ import GroupsView from '../Groups/GroupsView'
 import StandingsView from '../Standings/StandingsView'
 import MatchesView from '../Matches/MatchesView'
 import BracketView from '../Bracket/BracketView'
+import BuscarDuplaView from './BuscarDuplaView'
 import './TorneoDetailView.css'
 
-const TABS = [
+const ALL_TABS = [
+  { id: 'buscar-dupla', label: 'Buscar dupla', icon: '🤝', component: BuscarDuplaView, onlyInscripcion: true },
   { id: 'grupos',   label: 'Grupos',   icon: '🏆', component: GroupsView },
   { id: 'tabla',    label: 'Tabla',    icon: '📊', component: StandingsView },
   { id: 'partidos', label: 'Partidos', icon: '🎾', component: MatchesView },
@@ -25,7 +27,7 @@ const ESTADO_CONFIG = {
 
 export default function TorneoDetailView() {
   const { id } = useParams()
-  const { torneos, activeTorneo, setActiveTorneoId, loading } = useTorneo()
+  const { torneos, activeTorneo, setActiveTorneoId, loading, buscandoDupla } = useTorneo()
   const navigate = useNavigate()
   const isMobile = useIsMobile()
   const [activeTab, setActiveTab] = useState('grupos')
@@ -33,6 +35,10 @@ export default function TorneoDetailView() {
   useEffect(() => {
     if (id) setActiveTorneoId(id)
   }, [id])
+
+  useEffect(() => {
+    if (activeTorneo?.estado === 'Inscripción') setActiveTab('buscar-dupla')
+  }, [activeTorneo?.id])
 
   if (loading && torneos.length === 0) return <Spinner />
 
@@ -47,6 +53,7 @@ export default function TorneoDetailView() {
     )
   }
 
+  const TABS = ALL_TABS.filter(t => !t.onlyInscripcion || activeTorneo?.estado === 'Inscripción')
   const ActiveComponent = TABS.find(t => t.id === activeTab)?.component || GroupsView
   const estado = activeTorneo ? (ESTADO_CONFIG[activeTorneo.estado] || ESTADO_CONFIG['Finalizado']) : null
 
@@ -85,6 +92,9 @@ export default function TorneoDetailView() {
                 >
                   <span className="td-tab-icon">{tab.icon}</span>
                   {tab.label}
+                  {tab.id === 'buscar-dupla' && buscandoDupla.length > 0 && (
+                    <span className="td-tab-badge">{buscandoDupla.length}</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -112,7 +122,12 @@ export default function TorneoDetailView() {
                 transition: 'color 0.15s',
               }}
             >
-              <span style={{ fontSize: 18, marginBottom: 2, lineHeight: 1 }}>{tab.icon}</span>
+              <span style={{ fontSize: 18, marginBottom: 2, lineHeight: 1, position: 'relative' }}>
+                {tab.icon}
+                {tab.id === 'buscar-dupla' && buscandoDupla.length > 0 && (
+                  <span className="td-tab-badge td-tab-badge-mobile">{buscandoDupla.length}</span>
+                )}
+              </span>
               {tab.label}
             </button>
           ))}
