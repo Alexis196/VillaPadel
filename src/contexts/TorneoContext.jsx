@@ -14,6 +14,7 @@ export function TorneoProvider({ children }) {
   const [loadingTorneos, setLoadingTorneos] = useState(true)
   const [loadingData, setLoadingData] = useState(false)
 
+  const unsubZonasRef = useRef(null)
   const unsubPartidosRef = useRef(null)
   const unsubLlavesRef = useRef(null)
   const unsubBuscandoDuplaRef = useRef(null)
@@ -42,6 +43,7 @@ export function TorneoProvider({ children }) {
   useEffect(() => {
     if (!activeTorneoId) return
 
+    if (unsubZonasRef.current) { unsubZonasRef.current(); unsubZonasRef.current = null }
     if (unsubPartidosRef.current) { unsubPartidosRef.current(); unsubPartidosRef.current = null }
     if (unsubLlavesRef.current) { unsubLlavesRef.current(); unsubLlavesRef.current = null }
     if (unsubBuscandoDuplaRef.current) { unsubBuscandoDuplaRef.current(); unsubBuscandoDuplaRef.current = null }
@@ -52,8 +54,10 @@ export function TorneoProvider({ children }) {
     setLlaves([])
     setBuscandoDupla([])
 
-    getDocs(query(collection(db, 'torneos', activeTorneoId, 'zonas'), orderBy('orden')))
-      .then(snap => setZonas(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+    unsubZonasRef.current = onSnapshot(
+      query(collection(db, 'torneos', activeTorneoId, 'zonas'), orderBy('orden')),
+      snap => setZonas(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    )
 
     let firstLoad = true
     unsubPartidosRef.current = onSnapshot(
@@ -76,6 +80,7 @@ export function TorneoProvider({ children }) {
     )
 
     return () => {
+      if (unsubZonasRef.current) { unsubZonasRef.current(); unsubZonasRef.current = null }
       if (unsubPartidosRef.current) { unsubPartidosRef.current(); unsubPartidosRef.current = null }
       if (unsubLlavesRef.current) { unsubLlavesRef.current(); unsubLlavesRef.current = null }
       if (unsubBuscandoDuplaRef.current) { unsubBuscandoDuplaRef.current(); unsubBuscandoDuplaRef.current = null }

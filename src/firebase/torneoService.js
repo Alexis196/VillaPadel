@@ -13,11 +13,22 @@ export function checkAmericanSetWinner(gA, gB) {
   return null
 }
 
+// Fisher–Yates: uniform random shuffle. (`array.sort(() => Math.random() - 0.5)`
+// is a common anti-pattern — comparator-based shuffles are biased.)
+function shuffle(arr) {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
 // ─── Zone generation ──────────────────────────────────────────────────────────
 // tamanoZona: target pairs per zone (3 or 4, default 4)
 // Remainder distributed evenly: some zones get base+1 if n % numGroups > 0
 export function generateZonas(duplas, tamanoZona = 4) {
-  const shuffled = [...duplas].sort(() => Math.random() - 0.5)
+  const shuffled = shuffle(duplas)
   const n = shuffled.length
   if (n < 2) return [shuffled]
 
@@ -63,7 +74,7 @@ function roundRobinSchedule(count) {
 }
 
 // ─── Create tournament ────────────────────────────────────────────────────────
-export async function createTorneo({ nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, fechaFin, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona, ownerUid, ownerEmail }) {
+export async function createTorneo({ nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, fechaFin, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona, tercerSetDesde, ownerUid, ownerEmail }) {
   const today = new Date().toISOString().split('T')[0]
   const estado = fechaInicio > today ? 'Inscripción' : 'En curso'
   const ref = await addDoc(collection(db, 'torneos'), {
@@ -81,6 +92,8 @@ export async function createTorneo({ nombre, categoriaId, categoriaName, categor
     color: color || null,
     tamanoZona: Number(tamanoZona) || 4,
     clasificadosPorZona: Number(clasificadosPorZona) || 1,
+    tercerSetDesde: tercerSetDesde || 'semifinal',
+    repartoCampeonPct: 70,
     ownerUid: ownerUid || null,
     ownerEmail: ownerEmail || null,
     colaboradores: [],
@@ -94,28 +107,86 @@ export async function updateColaboradores(torneoId, colaboradores) {
   await setDoc(doc(db, 'torneos', torneoId), { colaboradores }, { merge: true })
 }
 
+// ─── Manually override tournament status ─────────────────────────────────────
+export async function updateTorneoEstado(torneoId, estado) {
+  await setDoc(doc(db, 'torneos', torneoId), { estado }, { merge: true })
+}
+
+// ─── Prize transparency (admin-only for now) ──────────────────────────────────
+export async function addGasto(torneoId, { descripcion, monto }) {
+  await addDoc(collection(db, 'torneos', torneoId, 'gastos'), {
+    descripcion: descripcion.trim(),
+    monto: Number(monto) || 0,
+    createdAt: serverTimestamp(),
+  })
+}
+
+export async function deleteGasto(torneoId, gastoId) {
+  await deleteDoc(doc(db, 'torneos', torneoId, 'gastos', gastoId))
+}
+
+export async function updateRepartoCampeon(torneoId, repartoCampeonPct) {
+  await setDoc(doc(db, 'torneos', torneoId), { repartoCampeonPct: Number(repartoCampeonPct) }, { merge: true })
+}
+
+// recaudado = suma de pagos ya marcados como 'pagado' en cada dupla (no lo que
+// falta cobrar). premioNeto = recaudado - gastos, repartido según repartoCampeonPct.
+export async function getPremioInfo(torneoId) {
+  const [duplasSnap, gastosSnap, torneoSnap] = await Promise.all([
+    getDocs(collection(db, 'torneos', torneoId, 'duplas')),
+    getDocs(query(collection(db, 'torneos', torneoId, 'gastos'), orderBy('createdAt', 'desc'))),
+    getDoc(doc(db, 'torneos', torneoId)),
+  ])
+
+  const recaudado = duplasSnap.docs.reduce((sum, d) => {
+    const { pago1, pago2 } = d.data()
+    const m1 = pago1?.estado === 'pagado' ? Number(pago1.monto) || 0 : 0
+    const m2 = pago2?.estado === 'pagado' ? Number(pago2.monto) || 0 : 0
+    return sum + m1 + m2
+  }, 0)
+
+  const gastos = gastosSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+  const totalGastos = gastos.reduce((sum, g) => sum + (Number(g.monto) || 0), 0)
+  const premioNeto = Math.max(0, recaudado - totalGastos)
+  const repartoCampeonPct = torneoSnap.data()?.repartoCampeonPct ?? 70
+  const montoCampeon = Math.round(premioNeto * repartoCampeonPct / 100)
+  const montoSubcampeon = premioNeto - montoCampeon
+
+  return { recaudado, gastos, totalGastos, premioNeto, repartoCampeonPct, montoCampeon, montoSubcampeon }
+}
+
 // ─── Update tournament ────────────────────────────────────────────────────────
-export async function updateTorneo(id, { nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, fechaFin, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona }) {
-  const today = new Date().toISOString().split('T')[0]
-  const estado = fechaInicio > today ? 'Inscripción' : 'En curso'
-  await setDoc(doc(db, 'torneos', id), {
+// estado is only recomputed from fechaInicio while the tournament is still in
+// Inscripción — once it has moved on (En curso/Llave/Finalizado), a routine edit
+// (fixing the name, tweaking the cost, setting tercerSetDesde) must not silently
+// regress it back.
+export async function updateTorneo(id, { nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, fechaFin, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona, tercerSetDesde }) {
+  const currentSnap = await getDoc(doc(db, 'torneos', id))
+  const currentEstado = currentSnap.data()?.estado
+  const data = {
     nombre, categoriaId, categoriaName,
     categoriaValor: Number(categoriaValor),
     costoPorJugador: Number(costoPorJugador),
-    fechaInicio, fechaFin: fechaFin || null, estado,
+    fechaInicio, fechaFin: fechaFin || null,
     tipoTorneo: tipoTorneo || 'categoria',
     modalidadTorneo: modalidadTorneo || 'tradicional',
     sexo: sexo || 'masculino',
     color: color || null,
     tamanoZona: Number(tamanoZona) || 4,
     clasificadosPorZona: Number(clasificadosPorZona) || 1,
-  }, { merge: true })
+    tercerSetDesde: tercerSetDesde || 'semifinal',
+  }
+  if (!currentEstado || currentEstado === 'Inscripción') {
+    const today = new Date().toISOString().split('T')[0]
+    data.estado = fechaInicio > today ? 'Inscripción' : 'En curso'
+  }
+  await setDoc(doc(db, 'torneos', id), data, { merge: true })
 }
 
 // ─── Delete tournament and all subcollections ─────────────────────────────────
 export async function deleteTorneo(id) {
   const batch = writeBatch(db)
-  const subcols = ['duplas', 'zonas', 'partidos', 'buscandoDupla']
+  const subcols = ['duplas', 'zonas', 'partidos', 'llaves', 'buscandoDupla', 'gastos']
   for (const sub of subcols) {
     const snap = await getDocs(collection(db, 'torneos', id, sub))
     snap.forEach(d => batch.delete(d.ref))
@@ -192,11 +263,14 @@ export async function generateFixture(torneoId) {
   const zonaGroups = generateZonas(duplas, tamanoZona)
   const batch = writeBatch(db)
 
-  // Delete any existing zonas/partidos
+  // Delete any existing zonas/partidos/llaves — a fixture regenerated from scratch
+  // invalidates any bracket built from the previous zonas/partidos.
   const oldZonas = await getDocs(collection(db, 'torneos', torneoId, 'zonas'))
   oldZonas.forEach(d => batch.delete(d.ref))
   const oldPartidos = await getDocs(collection(db, 'torneos', torneoId, 'partidos'))
   oldPartidos.forEach(d => batch.delete(d.ref))
+  const oldLlaves = await getDocs(collection(db, 'torneos', torneoId, 'llaves'))
+  oldLlaves.forEach(d => batch.delete(d.ref))
 
   // Create zonas and their partidos
   for (let z = 0; z < zonaGroups.length; z++) {
@@ -231,24 +305,51 @@ export async function generateFixture(torneoId) {
   await batch.commit()
 }
 
-// ─── Save match result ────────────────────────────────────────────────────────
-// APA scoring: Win=2pts, Loss=1pt, W.O.=0pts
-export async function saveResultado(torneoId, partidoId, { setsA, setsB, gamesA, gamesB, wo }) {
-  const ref = doc(db, 'torneos', torneoId, 'partidos', partidoId)
-  let ptsA, ptsB, estado
-
-  if (wo) {
-    ptsA = setsA > setsB ? 2 : 0
-    ptsB = setsA > setsB ? 0 : 2
-    estado = 'W.O.'
-  } else {
-    ptsA = setsA > setsB ? 2 : 1
-    ptsB = setsA > setsB ? 1 : 2
-    estado = 'Finalizado'
+// ─── Delete fixture and revert tournament back to Inscripción ────────────────
+export async function deleteFixture(torneoId) {
+  const batch = writeBatch(db)
+  const subcols = ['zonas', 'partidos', 'llaves']
+  for (const sub of subcols) {
+    const snap = await getDocs(collection(db, 'torneos', torneoId, sub))
+    snap.forEach(d => batch.delete(d.ref))
   }
+  batch.update(doc(db, 'torneos', torneoId), { estado: 'Inscripción', zonas: 0 })
+  await batch.commit()
+}
+
+// ─── Match result computation ─────────────────────────────────────────────────
+// Single source of truth for turning a scoreline into points + estado, shared by
+// manual entry, the live scoreboard, and both saveResultado/saveLlaveResultado —
+// so a tie can't sneak through in one path and not the other.
+// Scoring: Win=3pts, Loss=0pts (W.O. counts the same as a normal win/loss).
+// A tie is never a valid outcome.
+export function computeMatchResult(setsA, setsB, wo = false) {
+  const a = Number(setsA)
+  const b = Number(setsB)
+  if (!Number.isInteger(a) || !Number.isInteger(b) || a < 0 || b < 0) {
+    throw new Error('Los sets tienen que ser números enteros positivos.')
+  }
+  if (a === b) {
+    throw new Error('El resultado no puede quedar empatado — tiene que haber un ganador.')
+  }
+  const aWins = a > b
+  return {
+    ptsA: aWins ? 3 : 0,
+    ptsB: aWins ? 0 : 3,
+    estado: wo ? 'W.O.' : 'Finalizado',
+    aWins,
+  }
+}
+
+// ─── Save match result ────────────────────────────────────────────────────────
+// historialSets: optional [{ gA, gB }, ...] per-set game breakdown. gamesA/gamesB
+// stay as the match-wide total (used for the standings tiebreak either way).
+export async function saveResultado(torneoId, partidoId, { setsA, setsB, gamesA, gamesB, historialSets, wo }) {
+  const ref = doc(db, 'torneos', torneoId, 'partidos', partidoId)
+  const { ptsA, ptsB, estado } = computeMatchResult(setsA, setsB, wo)
 
   await setDoc(ref, {
-    resultado: { setsA, setsB, gamesA: gamesA || 0, gamesB: gamesB || 0 },
+    resultado: { setsA, setsB, gamesA: gamesA || 0, gamesB: gamesB || 0, historialSets: historialSets || [] },
     ptsA, ptsB, estado,
   }, { merge: true })
 }
@@ -327,14 +428,20 @@ export async function deleteJugador(id) {
 }
 
 // ─── Bracket: first-round pairings (0-indexed seeds) ─────────────────────────
-// Ensures top seeds can only meet in later rounds (standard seeding)
+// Ensures top seeds can only meet in later rounds (standard seeding), for any
+// bracket size (power of 2) — not just the 2/4/8/16 cases used in practice.
+function seedOrder(n) {
+  if (n === 1) return [1]
+  const prev = seedOrder(n / 2)
+  const result = []
+  for (const s of prev) result.push(s, n + 1 - s)
+  return result
+}
+
 function getFirstRoundPairs(bracketSize) {
-  if (bracketSize === 2)  return [[0, 1]]
-  if (bracketSize === 4)  return [[0, 3], [1, 2]]
-  if (bracketSize === 8)  return [[0, 7], [3, 4], [1, 6], [2, 5]]
-  if (bracketSize === 16) return [[0,15],[7,8],[4,11],[3,12],[1,14],[6,9],[5,10],[2,13]]
+  const order = seedOrder(bracketSize)
   const pairs = []
-  for (let i = 0; i < bracketSize / 2; i++) pairs.push([i, bracketSize - 1 - i])
+  for (let i = 0; i < order.length; i += 2) pairs.push([order[i] - 1, order[i + 1] - 1])
   return pairs
 }
 
@@ -358,21 +465,24 @@ export async function generateBracket(torneoId) {
   const zonasArr = zonasSnap.docs.map(d => ({ id: d.id, ...d.data() }))
   const partidosArr = partidosSnap.docs.map(d => ({ id: d.id, ...d.data() }))
 
-  // Seed order: all zone winners first, then runners-up, etc.
-  const seededTeams = []
-  for (let k = 0; k < clasificadosPorZona; k++) {
-    for (const zona of zonasArr) {
-      const zonaPartidos = partidosArr.filter(p => p.zonaId === zona.id)
-      const standings = computeStandings(zonaPartidos, zona.duplas || [])
-      if (standings[k]) {
-        seededTeams.push({
-          id: standings[k].id,
-          jugador1: standings[k].jugador1,
-          jugador2: standings[k].jugador2,
-        })
-      }
+  // Seed order: every qualifier ranked globally by merit (points → sets won →
+  // game difference), across all zones — not "all zone winners, then all
+  // runners-up" regardless of how those winners/runners-up actually performed.
+  // This is what decides who gets a bye straight to the next round when the
+  // qualifier count isn't a clean power of two: the best teams overall, not
+  // just whoever happened to finish 1st in their own zone.
+  const qualifiers = []
+  for (const zona of zonasArr) {
+    const zonaPartidos = partidosArr.filter(p => p.zonaId === zona.id)
+    const standings = computeStandings(zonaPartidos, zona.duplas || [])
+    for (let k = 0; k < clasificadosPorZona; k++) {
+      if (standings[k]) qualifiers.push(standings[k])
     }
   }
+
+  const seededTeams = [...qualifiers].sort((a, b) =>
+    b.pts - a.pts || b.setsF - a.setsF || b.gamesF - a.gamesF
+  )
 
   const N = seededTeams.length
   if (N < 2) throw new Error('Se necesitan al menos 2 clasificados para generar la llave.')
@@ -410,8 +520,8 @@ export async function generateBracket(torneoId) {
       round: 1, roundName: roundNames[0], matchIndex: i,
       duplaA: teamA, duplaB: teamB, resultado: null,
       estado: isBye ? 'BYE' : 'Programado',
-      ptsA: isBye ? (teamA ? 2 : 0) : null,
-      ptsB: isBye ? (teamB ? 2 : 0) : null,
+      ptsA: isBye ? (teamA ? 3 : 0) : null,
+      ptsB: isBye ? (teamB ? 3 : 0) : null,
       nextLlaveId: nextRef?.id || null,
       nextSlot: nextRef ? nextSlot : null,
     })
@@ -445,29 +555,28 @@ export async function generateBracket(torneoId) {
   }
 }
 
+// ─── Delete bracket and revert tournament back to group stage ────────────────
+export async function deleteBracket(torneoId) {
+  const llavesSnap = await getDocs(collection(db, 'torneos', torneoId, 'llaves'))
+  const batch = writeBatch(db)
+  llavesSnap.forEach(d => batch.delete(d.ref))
+  batch.update(doc(db, 'torneos', torneoId), { estado: 'En curso' })
+  await batch.commit()
+}
+
 // ─── Save bracket match result ────────────────────────────────────────────────
 // Saves result and propagates winner to the next bracket match.
 // When both teams are now set in the next match, changes its estado to 'Programado'.
-export async function saveLlaveResultado(torneoId, llaveId, { setsA, setsB, gamesA, gamesB, wo }) {
+export async function saveLlaveResultado(torneoId, llaveId, { setsA, setsB, gamesA, gamesB, historialSets, wo }) {
   const llaveRef = doc(db, 'torneos', torneoId, 'llaves', llaveId)
   const snap = await getDoc(llaveRef)
   const data = snap.data()
 
-  let ptsA, ptsB, estado
-  if (wo) {
-    ptsA = setsA > setsB ? 2 : 0
-    ptsB = setsA > setsB ? 0 : 2
-    estado = 'W.O.'
-  } else {
-    ptsA = setsA > setsB ? 2 : 1
-    ptsB = setsA > setsB ? 1 : 2
-    estado = 'Finalizado'
-  }
-
-  const winner = ptsA > ptsB ? data.duplaA : data.duplaB
+  const { ptsA, ptsB, estado, aWins } = computeMatchResult(setsA, setsB, wo)
+  const winner = aWins ? data.duplaA : data.duplaB
   const batch = writeBatch(db)
   batch.update(llaveRef, {
-    resultado: { setsA, setsB, gamesA: gamesA || 0, gamesB: gamesB || 0 },
+    resultado: { setsA, setsB, gamesA: gamesA || 0, gamesB: gamesB || 0, historialSets: historialSets || [] },
     ptsA, ptsB, estado,
   })
 
@@ -488,7 +597,7 @@ export async function saveLlaveResultado(torneoId, llaveId, { setsA, setsB, game
 // ─── Compute standings from matches ──────────────────────────────────────────
 // Rules:
 //   - If a dupla lost ALL their group matches (PG === 0), they get 0 points total.
-//   - Tiebreaker cascade: pts DESC → setsF DESC (sets won) → (gamesF - gamesC) DESC
+//   - Tiebreaker cascade: pts DESC → head-to-head → setsF DESC (sets won) → gamesF DESC (total games won)
 export function computeStandings(partidos, duplas) {
   const stats = {}
   for (const d of duplas) {
@@ -503,6 +612,7 @@ export function computeStandings(partidos, duplas) {
     }
   }
 
+  const headToHead = {}
   for (const p of partidos) {
     if (!p.resultado || p.estado === 'Programado') continue
     const a = stats[p.duplaA.id]
@@ -517,6 +627,9 @@ export function computeStandings(partidos, duplas) {
     b.gamesF += gamesB || 0; b.gamesC += gamesA || 0
     a.pts += p.ptsA || 0
     b.pts += p.ptsB || 0
+    const winnerId = (p.ptsA || 0) > (p.ptsB || 0) ? p.duplaA.id : p.duplaB.id
+    headToHead[`${p.duplaA.id}_${p.duplaB.id}`] = winnerId
+    headToHead[`${p.duplaB.id}_${p.duplaA.id}`] = winnerId
     if ((p.ptsA || 0) > (p.ptsB || 0)) { a.PG++; b.PP++ }
     else { b.PG++; a.PP++ }
   }
@@ -526,9 +639,70 @@ export function computeStandings(partidos, duplas) {
     if (stat.PJ > 0 && stat.PG === 0) stat.pts = 0
   }
 
-  return Object.values(stats).sort(
-    (a, b) => b.pts - a.pts || b.setsF - a.setsF || (b.gamesF - b.gamesC) - (a.gamesF - a.gamesC)
-  )
+  return Object.values(stats).sort((a, b) => {
+    if (b.pts !== a.pts) return b.pts - a.pts
+    const h2hWinner = headToHead[`${a.id}_${b.id}`]
+    if (h2hWinner === a.id) return -1
+    if (h2hWinner === b.id) return 1
+    return b.setsF - a.setsF || b.gamesF - a.gamesF
+  })
+}
+
+// ─── Champions history ─────────────────────────────────────────────────────────
+// Derives the champion/runner-up from the Final bracket match, plus the
+// champion's full path through the bracket (opponent + score per round).
+// Nothing new to store — it's all already in llaves. Checked against the
+// Final's own result rather than requiring torneo.estado === 'Finalizado' —
+// admins generate the bracket and finish playing it, but don't necessarily
+// remember to also flip the tournament's own status label afterwards, so
+// requiring that label would silently hide champions that are already decided
+// (this mirrors how BracketView already shows the trophy card).
+export async function getCampeones() {
+  // Sorted client-side instead of orderBy('createdAt') in the query — combining
+  // that with where('estado', ...) needs a composite index created manually in
+  // the Firebase console, which isn't worth the setup step for this.
+  const torneosSnap = await getDocs(query(collection(db, 'torneos'), where('estado', 'in', ['Llave', 'Finalizado'])))
+  const torneos = torneosSnap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+
+  const campeones = []
+  for (const t of torneos) {
+    const llavesSnap = await getDocs(collection(db, 'torneos', t.id, 'llaves'))
+    const llaves = llavesSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+    if (llaves.length === 0) continue
+
+    const maxRound = Math.max(...llaves.map(l => l.round || 0))
+    const final = llaves.find(l => l.round === maxRound && l.resultado)
+    if (!final?.duplaA || !final?.duplaB) continue
+
+    const aWon = (final.ptsA || 0) > (final.ptsB || 0)
+    const campeon = aWon ? final.duplaA : final.duplaB
+    const subcampeon = aWon ? final.duplaB : final.duplaA
+
+    const camino = llaves
+      .filter(l => l.resultado && (l.duplaA?.id === campeon.id || l.duplaB?.id === campeon.id))
+      .sort((a, b) => (a.round || 0) - (b.round || 0))
+      .map(l => {
+        const isA = l.duplaA?.id === campeon.id
+        return {
+          roundName: l.roundName,
+          rival: isA ? l.duplaB : l.duplaA,
+          setsCampeon: isA ? l.resultado.setsA : l.resultado.setsB,
+          setsRival: isA ? l.resultado.setsB : l.resultado.setsA,
+        }
+      })
+
+    campeones.push({
+      torneoId: t.id,
+      torneoNombre: t.nombre,
+      categoriaName: t.categoriaName,
+      color: t.color,
+      fecha: t.fechaFin || t.fechaInicio,
+      campeon, subcampeon, camino,
+    })
+  }
+  return campeones
 }
 
 // ─── Solicitudes de acceso admin ──────────────────────────────────────────────

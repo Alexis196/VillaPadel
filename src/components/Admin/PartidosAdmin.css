@@ -61,6 +61,23 @@
   line-height: 1;
 }
 
+/* Prompt variant (asks before a destructive/generative action) */
+.pa-alert-prompt {
+  background: rgba(139,92,246,0.1);
+  border-color: rgba(139,92,246,0.3);
+  flex-wrap: wrap;
+}
+.pa-alert-prompt .pa-alert-text { color: #8b5cf6; }
+.pa-alert-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.pa-alert-btn-ghost {
+  background: transparent; border: 1px solid rgba(139,92,246,0.3); border-radius: 7px;
+  color: #8b5cf6; font-size: 12px; font-weight: 600; padding: 6px 12px; cursor: pointer;
+}
+.pa-alert-btn-solid {
+  background: #8b5cf6; border: none; border-radius: 7px;
+  color: #fff; font-size: 12px; font-weight: 600; padding: 6px 14px; cursor: pointer;
+}
+
 /* Filter toolbar */
 .pa-filter-bar {
   display: flex;
@@ -239,9 +256,14 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.pa-inputs-group { display: flex; gap: 8px; }
-.pa-result-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.pa-result-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 14px; }
 .pa-wo-label { display: flex; align-items: center; gap: 6px; color: #ef4444; font-size: 13px; cursor: pointer; }
+
+/* Per-set games breakdown (manual result entry) */
+.pa-sets-breakdown { background: #16161e; border: 1px solid #2a2a38; border-radius: 8px; padding: 10px 12px; margin-bottom: 4px; }
+.pa-set-breakdown-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.pa-set-breakdown-label { color: #9999b0; font-size: 11px; width: 40px; flex-shrink: 0; }
+.pa-set-breakdown-row .pa-input-num { width: 56px; }
 
 /* Text helpers */
 .pa-player-main { color: #f1f1f5; font-size: 13px; font-weight: 600; }

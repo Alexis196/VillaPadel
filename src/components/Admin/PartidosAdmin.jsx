@@ -1,7 +1,11 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { collection, getDocs, query, orderBy } from 'firebase/firestore'
+import { collection, getDocs, query, orderBy, onSnapshot } from 'firebase/firestore'
 import { db } from '../../firebase/config'
-import { updateHorario, saveResultado, updateEstado, updateLlaveEstado, updateMarcador, updateLlaveMarcador, generateBracket, saveLlaveResultado } from '../../firebase/torneoService'
+import {
+  updateHorario, saveResultado, updateEstado, updateLlaveEstado, updateMarcador, updateLlaveMarcador,
+  generateBracket, saveLlaveResultado, computeMatchResult, checkAmericanSetWinner,
+} from '../../firebase/torneoService'
+import { useTorneo } from '../../contexts/TorneoContext'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import Spinner from '../ui/Spinner'
 import AppSelect from '../ui/AppSelect'
@@ -48,14 +52,62 @@ const defaultMarcador = () => ({
   tbPuntosA: 0, tbPuntosB: 0,
 })
 
+// Rounds counted backwards from the final (Final is always the last round,
+// Semifinal always second-to-last, etc.) so "3er set desde" works regardless
+// of how many total rounds a given bracket has.
+const ROUND_OFFSET_FROM_FINAL = { final: 0, semifinal: 1, cuartos: 2, octavos: 3 }
+
+// A 1-1 scoreline is never a valid final result (computeMatchResult rejects it as
+// a tie) — but it's also the single most common way an admin actually reaches
+// this error, since that's how the match "felt" before the decider. When the
+// match doesn't play a full 3rd set, 1-1 is decided by a super tiebreak, which
+// counts as winning the 3rd set — so the real final tally is 2-1 (or 1-2),
+// recorded as 7-6/6-7 for that set, same convention the live scoreboard uses.
+function tieHint(setsA, setsB, allowThirdSet) {
+  if (allowThirdSet) return null
+  if (Number(setsA) !== 1 || Number(setsB) !== 1) return null
+  return 'Un 1-1 se define por súper tiebreak, que cuenta como el 3er set: cargá el resultado final como 2-1 (o 1-2) y anotá 7-6 / 6-7 en el Set 3.'
+}
+
+// ─── Per-set games input (manual result entry) ────────────────────────────────
+// Row count follows setsA + setsB (how many sets were actually played), so a
+// 2-1 result gets 3 rows instead of a single aggregate games field.
+function SetsBreakdown({ setsA, setsB, sets, onChange }) {
+  const totalSets = (Number(setsA) || 0) + (Number(setsB) || 0)
+  if (totalSets === 0) return null
+  const rows = Array.from({ length: totalSets }, (_, i) => sets[i] || { gA: '', gB: '' })
+
+  function updateRow(i, field, val) {
+    const next = [...rows]
+    next[i] = { ...next[i], [field]: val }
+    onChange(next)
+  }
+
+  return (
+    <div className="pa-sets-breakdown">
+      <div className="pa-field-label-sm">GAMES POR SET</div>
+      {rows.map((row, i) => (
+        <div key={i} className="pa-set-breakdown-row">
+          <span className="pa-set-breakdown-label">Set {i + 1}</span>
+          <input type="number" min="0" placeholder="A" value={row.gA} onChange={e => updateRow(i, 'gA', e.target.value)} className="pa-input-num" />
+          <span className="pa-muted">–</span>
+          <input type="number" min="0" placeholder="B" value={row.gB} onChange={e => updateRow(i, 'gB', e.target.value)} className="pa-input-num" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── Live score panel ─────────────────────────────────────────────────────────
 // allowThirdSet=false → zone matches: 1-1 sets triggers super tiebreak instead of 3rd set
 // allowThirdSet=true  → bracket SF/Final: full 3 sets
-function LiveScorePanel({ match, torneoId, onUpdated, allowThirdSet = false, saveFn, persistFn }) {
+// modalidad='americano' → single set to 9 games (win by 2 past 8-8), no tiebreak-at-6, no allowThirdSet
+function LiveScorePanel({ match, torneoId, onUpdated, allowThirdSet = false, modalidad = 'tradicional', saveFn, persistFn }) {
   const [m, setM] = useState(() => match.marcador ? { ...defaultMarcador(), ...match.marcador } : defaultMarcador())
   const [finishing, setFinishing] = useState(false)
+  const isAmericano = modalidad === 'americano'
 
-  const matchDone = m.setsA >= 2 || m.setsB >= 2
+  const matchDone = isAmericano ? (m.setsA >= 1 || m.setsB >= 1) : (m.setsA >= 2 || m.setsB >= 2)
 
   async function persist(newM) {
     setM(newM)
@@ -71,6 +123,16 @@ function LiveScorePanel({ match, torneoId, onUpdated, allowThirdSet = false, sav
     newM.puntosA = 0; newM.puntosB = 0; newM.enOroDePunto = false
     if (team === 'A') newM.gamesA += 1
     else newM.gamesB += 1
+
+    if (isAmericano) {
+      const winner = checkAmericanSetWinner(newM.gamesA, newM.gamesB)
+      if (winner) {
+        newM.historialSets = [...newM.historialSets, { gA: newM.gamesA, gB: newM.gamesB }]
+        if (winner === 'A') newM.setsA += 1
+        else newM.setsB += 1
+      }
+      return
+    }
 
     if (needsTiebreak(newM.gamesA, newM.gamesB)) {
       newM.enTiebreak = true
@@ -197,11 +259,10 @@ function LiveScorePanel({ match, torneoId, onUpdated, allowThirdSet = false, sav
     const totalGamesA = m.historialSets.reduce((s, set) => s + set.gA, 0)
     const totalGamesB = m.historialSets.reduce((s, set) => s + set.gB, 0)
     try {
-      const resultData = { setsA: m.setsA, setsB: m.setsB, gamesA: totalGamesA, gamesB: totalGamesB, wo: false }
+      const resultData = { setsA: m.setsA, setsB: m.setsB, gamesA: totalGamesA, gamesB: totalGamesB, historialSets: m.historialSets, wo: false }
+      const { ptsA, ptsB } = computeMatchResult(resultData.setsA, resultData.setsB, false)
       await (saveFn ? saveFn(resultData) : saveResultado(torneoId, match.id, resultData))
-      const ptsA = m.setsA > m.setsB ? 2 : 1
-      const ptsB = m.setsA > m.setsB ? 1 : 2
-      onUpdated({ ...match, estado: 'Finalizado', resultado: { setsA: m.setsA, setsB: m.setsB, gamesA: totalGamesA, gamesB: totalGamesB }, ptsA, ptsB, marcador: m })
+      onUpdated({ ...match, estado: 'Finalizado', resultado: { setsA: m.setsA, setsB: m.setsB, gamesA: totalGamesA, gamesB: totalGamesB, historialSets: m.historialSets }, ptsA, ptsB, marcador: m })
     } catch (err) {
       alert('Error al finalizar partido: ' + (err.message || 'Error. Revisá la conexión.'))
     }
@@ -218,9 +279,11 @@ function LiveScorePanel({ match, torneoId, onUpdated, allowThirdSet = false, sav
       {/* Header */}
       <div className="pa-live-header">
         <span className="pa-live-title">
-          {!allowThirdSet && m.enTiebreak && m.tiebreakTipo === 'supertb' && m.setsA === 1 && m.setsB === 1
-            ? 'MARCADOR EN VIVO · SUPER TIEBREAK'
-            : `MARCADOR EN VIVO · Set ${m.historialSets.length + (matchDone ? 0 : 1)}`}
+          {isAmericano
+            ? 'MARCADOR EN VIVO · AMERICANO A 9'
+            : !allowThirdSet && m.enTiebreak && m.tiebreakTipo === 'supertb' && m.setsA === 1 && m.setsB === 1
+              ? 'MARCADOR EN VIVO · SUPER TIEBREAK'
+              : `MARCADOR EN VIVO · Set ${m.historialSets.length + (matchDone ? 0 : 1)}`}
         </span>
         <div className="pa-live-sets-row">
           {setDisplay}
@@ -320,7 +383,10 @@ function LiveScorePanel({ match, torneoId, onUpdated, allowThirdSet = false, sav
                 </div>
               </div>
 
-              {m.gamesA === 5 && m.gamesB === 5 && (
+              {isAmericano && m.gamesA >= 8 && m.gamesB >= 8 && (
+                <p className="pa-five-five">8-8 → gana por diferencia de 2</p>
+              )}
+              {!isAmericano && m.gamesA === 5 && m.gamesB === 5 && (
                 <p className="pa-five-five">5-5 → se extiende a 7</p>
               )}
             </div>
@@ -347,10 +413,15 @@ function LiveScorePanel({ match, torneoId, onUpdated, allowThirdSet = false, sav
 }
 
 // ─── Match row (zone matches) ─────────────────────────────────────────────────
-function MatchRow({ match, torneoId, onUpdated, open, onToggle }) {
+function MatchRow({ match, torneoId, modalidad, onUpdated, open, onToggle }) {
   const [tab, setTab] = useState('horario')
   const [horario, setHorario] = useState({ fecha: match.fecha || '', hora: match.hora || '', cancha: match.cancha || '' })
-  const [res, setRes] = useState({ setsA: match.resultado?.setsA ?? '', setsB: match.resultado?.setsB ?? '', gamesA: match.resultado?.gamesA ?? '', gamesB: match.resultado?.gamesB ?? '', wo: false })
+  const [res, setRes] = useState({
+    setsA: match.resultado?.setsA ?? '',
+    setsB: match.resultado?.setsB ?? '',
+    sets: (match.resultado?.historialSets || []).map(s => ({ gA: String(s.gA ?? ''), gB: String(s.gB ?? '') })),
+    wo: false,
+  })
   const [saving, setSaving] = useState(false)
   const [savingEstado, setSavingEstado] = useState(false)
   const [msg, setMsg] = useState('')
@@ -385,16 +456,25 @@ function MatchRow({ match, torneoId, onUpdated, open, onToggle }) {
   }
 
   async function saveRes() {
-    const { setsA, setsB, gamesA, gamesB, wo } = res
+    const { setsA, setsB, sets, wo } = res
     if (setsA === '' || setsB === '') { setMsg('Ingresá los sets.'); setTimeout(() => setMsg(''), 2000); return }
+    let ptsA, ptsB, estado
+    try {
+      ({ ptsA, ptsB, estado } = computeMatchResult(setsA, setsB, wo))
+    } catch (err) {
+      setMsg('⚠️ ' + (tieHint(setsA, setsB, false) || err.message))
+      return
+    }
+    const totalSets = Number(setsA) + Number(setsB)
+    const historialSets = sets.slice(0, totalSets).map(s => ({ gA: Number(s.gA) || 0, gB: Number(s.gB) || 0 }))
+    const gamesA = historialSets.reduce((sum, s) => sum + s.gA, 0)
+    const gamesB = historialSets.reduce((sum, s) => sum + s.gB, 0)
     setSaving(true)
     try {
-      await saveResultado(torneoId, match.id, { setsA: Number(setsA), setsB: Number(setsB), gamesA: Number(gamesA) || 0, gamesB: Number(gamesB) || 0, wo })
+      await saveResultado(torneoId, match.id, { setsA: Number(setsA), setsB: Number(setsB), gamesA, gamesB, historialSets, wo })
       setMsg('Resultado guardado')
       setTimeout(() => setMsg(''), 2000)
-      const ptsA = Number(setsA) > Number(setsB) ? 2 : (wo ? 0 : 1)
-      const ptsB = Number(setsA) > Number(setsB) ? (wo ? 0 : 1) : 2
-      onUpdated({ ...match, resultado: { setsA: Number(setsA), setsB: Number(setsB), gamesA: Number(gamesA) || 0, gamesB: Number(gamesB) || 0 }, ptsA, ptsB, estado: wo ? 'W.O.' : 'Finalizado' })
+      onUpdated({ ...match, resultado: { setsA: Number(setsA), setsB: Number(setsB), gamesA, gamesB, historialSets }, ptsA, ptsB, estado })
     } catch (err) {
       setMsg('Error al guardar: ' + (err.message || 'Error'))
       setTimeout(() => setMsg(''), 4000)
@@ -495,7 +575,7 @@ function MatchRow({ match, torneoId, onUpdated, open, onToggle }) {
           )}
 
           {match.estado === 'En juego' ? (
-            <LiveScorePanel match={match} torneoId={torneoId} onUpdated={onUpdated} />
+            <LiveScorePanel match={match} torneoId={torneoId} onUpdated={onUpdated} modalidad={modalidad} />
           ) : (
             <>
               {/* Tab select */}
@@ -537,33 +617,18 @@ function MatchRow({ match, torneoId, onUpdated, open, onToggle }) {
                     <div className="pa-result-row">
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="pa-result-dupla-name">{match.duplaA?.jugador1} / {match.duplaA?.jugador2}</div>
-                        <div className="pa-inputs-group">
-                          <div>
-                            <div className="pa-field-label-sm">SETS</div>
-                            <input type="number" min="0" max="3" value={res.setsA} onChange={e => setRes(p => ({ ...p, setsA: e.target.value }))} className="pa-input-num" />
-                          </div>
-                          <div>
-                            <div className="pa-field-label-sm">GAMES</div>
-                            <input type="number" min="0" value={res.gamesA} onChange={e => setRes(p => ({ ...p, gamesA: e.target.value }))} className="pa-input-num" />
-                          </div>
-                        </div>
+                        <div className="pa-field-label-sm">SETS GANADOS</div>
+                        <input type="number" min="0" max="3" value={res.setsA} onChange={e => setRes(p => ({ ...p, setsA: e.target.value }))} className="pa-input-num" />
                       </div>
                       <div className="pa-muted" style={{ fontWeight: 700, fontSize: 16, flexShrink: 0 }}>vs</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="pa-result-dupla-name">{match.duplaB?.jugador1} / {match.duplaB?.jugador2}</div>
-                        <div className="pa-inputs-group">
-                          <div>
-                            <div className="pa-field-label-sm">SETS</div>
-                            <input type="number" min="0" max="3" value={res.setsB} onChange={e => setRes(p => ({ ...p, setsB: e.target.value }))} className="pa-input-num" />
-                          </div>
-                          <div>
-                            <div className="pa-field-label-sm">GAMES</div>
-                            <input type="number" min="0" value={res.gamesB} onChange={e => setRes(p => ({ ...p, gamesB: e.target.value }))} className="pa-input-num" />
-                          </div>
-                        </div>
+                        <div className="pa-field-label-sm">SETS GANADOS</div>
+                        <input type="number" min="0" max="3" value={res.setsB} onChange={e => setRes(p => ({ ...p, setsB: e.target.value }))} className="pa-input-num" />
                       </div>
                     </div>
                   </div>
+                  <SetsBreakdown setsA={res.setsA} setsB={res.setsB} sets={res.sets} onChange={sets => setRes(p => ({ ...p, sets }))} />
                   <div className="pa-result-actions">
                     <label className="pa-wo-label">
                       <input type="checkbox" checked={res.wo} onChange={e => setRes(p => ({ ...p, wo: e.target.checked }))} />
@@ -586,14 +651,13 @@ function MatchRow({ match, torneoId, onUpdated, open, onToggle }) {
 }
 
 // ─── Llave row (bracket matches) ──────────────────────────────────────────────
-function LlaveRow({ llave, torneoId, onUpdated }) {
+function LlaveRow({ llave, torneoId, modalidad, allowThirdSet, onUpdated }) {
   const [open, setOpen] = useState(false)
   const isCardView = useIsMobile(720)
   const [res, setRes] = useState({
     setsA: llave.resultado?.setsA ?? '',
     setsB: llave.resultado?.setsB ?? '',
-    gamesA: llave.resultado?.gamesA ?? '',
-    gamesB: llave.resultado?.gamesB ?? '',
+    sets: (llave.resultado?.historialSets || []).map(s => ({ gA: String(s.gA ?? ''), gB: String(s.gB ?? '') })),
     wo: false,
   })
   const [saving, setSaving] = useState(false)
@@ -606,8 +670,9 @@ function LlaveRow({ llave, torneoId, onUpdated }) {
         ...p,
         setsA: llave.resultado.setsA ?? p.setsA,
         setsB: llave.resultado.setsB ?? p.setsB,
-        gamesA: llave.resultado.gamesA ?? p.gamesA,
-        gamesB: llave.resultado.gamesB ?? p.gamesB,
+        sets: llave.resultado.historialSets
+          ? llave.resultado.historialSets.map(s => ({ gA: String(s.gA ?? ''), gB: String(s.gB ?? '') }))
+          : p.sets,
       }))
     }
   }, [llave.resultado])
@@ -636,19 +701,25 @@ function LlaveRow({ llave, torneoId, onUpdated }) {
   const canEdit = !isBye && !isPending && duplaA && duplaB
 
   async function saveRes() {
-    const { setsA, setsB, gamesA, gamesB, wo } = res
+    const { setsA, setsB, sets, wo } = res
     if (setsA === '' || setsB === '') { setMsg('Ingresá los sets.'); setTimeout(() => setMsg(''), 2000); return }
+    let ptsA, ptsB, estado
+    try {
+      ({ ptsA, ptsB, estado } = computeMatchResult(setsA, setsB, wo))
+    } catch (err) {
+      setMsg('⚠️ ' + (tieHint(setsA, setsB, allowThirdSet) || err.message))
+      return
+    }
+    const totalSets = Number(setsA) + Number(setsB)
+    const historialSets = sets.slice(0, totalSets).map(s => ({ gA: Number(s.gA) || 0, gB: Number(s.gB) || 0 }))
+    const gamesA = historialSets.reduce((sum, s) => sum + s.gA, 0)
+    const gamesB = historialSets.reduce((sum, s) => sum + s.gB, 0)
     setSaving(true)
     try {
-      await saveLlaveResultado(torneoId, llave.id, {
-        setsA: Number(setsA), setsB: Number(setsB),
-        gamesA: Number(gamesA) || 0, gamesB: Number(gamesB) || 0, wo,
-      })
+      await saveLlaveResultado(torneoId, llave.id, { setsA: Number(setsA), setsB: Number(setsB), gamesA, gamesB, historialSets, wo })
       setMsg('Resultado guardado')
       setTimeout(() => setMsg(''), 2000)
-      const ptsA = Number(setsA) > Number(setsB) ? 2 : (wo ? 0 : 1)
-      const ptsB = Number(setsA) > Number(setsB) ? (wo ? 0 : 1) : 2
-      onUpdated({ ...llave, resultado: { setsA: Number(setsA), setsB: Number(setsB), gamesA: Number(gamesA)||0, gamesB: Number(gamesB)||0 }, ptsA, ptsB, estado: wo ? 'W.O.' : 'Finalizado' })
+      onUpdated({ ...llave, resultado: { setsA: Number(setsA), setsB: Number(setsB), gamesA, gamesB, historialSets }, ptsA, ptsB, estado })
     } catch (err) {
       setMsg('Error al guardar: ' + (err.message || 'Error'))
       setTimeout(() => setMsg(''), 4000)
@@ -770,7 +841,8 @@ function LlaveRow({ llave, torneoId, onUpdated }) {
               match={llave}
               torneoId={torneoId}
               onUpdated={onUpdated}
-              allowThirdSet={llave.roundName === 'Semifinal' || llave.roundName === 'Final'}
+              allowThirdSet={allowThirdSet}
+              modalidad={modalidad}
               saveFn={(result) => saveLlaveResultado(torneoId, llave.id, result)}
               persistFn={(newM) => updateLlaveMarcador(torneoId, llave.id, newM)}
             />
@@ -781,34 +853,19 @@ function LlaveRow({ llave, torneoId, onUpdated }) {
                   <div className="pa-result-dupla-name">
                     {duplaA.jugador1}{duplaA.jugador2 ? ` / ${duplaA.jugador2}` : ''}
                   </div>
-                  <div className="pa-inputs-group">
-                    <div>
-                      <div className="pa-field-label-sm">SETS</div>
-                      <input type="number" min="0" max="3" value={res.setsA} onChange={e => setRes(p => ({ ...p, setsA: e.target.value }))} className="pa-input-num" />
-                    </div>
-                    <div>
-                      <div className="pa-field-label-sm">GAMES</div>
-                      <input type="number" min="0" value={res.gamesA} onChange={e => setRes(p => ({ ...p, gamesA: e.target.value }))} className="pa-input-num" />
-                    </div>
-                  </div>
+                  <div className="pa-field-label-sm">SETS GANADOS</div>
+                  <input type="number" min="0" max="3" value={res.setsA} onChange={e => setRes(p => ({ ...p, setsA: e.target.value }))} className="pa-input-num" />
                 </div>
                 <div className="pa-muted" style={{ fontWeight: 700, fontSize: 16, flexShrink: 0 }}>vs</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="pa-result-dupla-name">
                     {duplaB.jugador1}{duplaB.jugador2 ? ` / ${duplaB.jugador2}` : ''}
                   </div>
-                  <div className="pa-inputs-group">
-                    <div>
-                      <div className="pa-field-label-sm">SETS</div>
-                      <input type="number" min="0" max="3" value={res.setsB} onChange={e => setRes(p => ({ ...p, setsB: e.target.value }))} className="pa-input-num" />
-                    </div>
-                    <div>
-                      <div className="pa-field-label-sm">GAMES</div>
-                      <input type="number" min="0" value={res.gamesB} onChange={e => setRes(p => ({ ...p, gamesB: e.target.value }))} className="pa-input-num" />
-                    </div>
-                  </div>
+                  <div className="pa-field-label-sm">SETS GANADOS</div>
+                  <input type="number" min="0" max="3" value={res.setsB} onChange={e => setRes(p => ({ ...p, setsB: e.target.value }))} className="pa-input-num" />
                 </div>
               </div>
+              <SetsBreakdown setsA={res.setsA} setsB={res.setsB} sets={res.sets} onChange={sets => setRes(p => ({ ...p, sets }))} />
               <div className="pa-result-actions">
                 <label className="pa-wo-label">
                   <input type="checkbox" checked={res.wo} onChange={e => setRes(p => ({ ...p, wo: e.target.checked }))} />
@@ -830,6 +887,7 @@ function LlaveRow({ llave, torneoId, onUpdated }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function PartidosAdmin() {
   const isCardView = useIsMobile(720)
+  const { refreshTorneos } = useTorneo()
   const [torneos, setTorneos] = useState([])
   const [activeTorneo, setActiveTorneo] = useState(null)
   const [activeTorneoId, setActiveTorneoId] = useState(null)
@@ -846,16 +904,88 @@ export default function PartidosAdmin() {
   const [page, setPage] = useState(1)
   const [autoLlaveMsg, setAutoLlaveMsg] = useState('')
   const [generatingAutoLlave, setGeneratingAutoLlave] = useState(false)
+  const [pendingAutoLlave, setPendingAutoLlave] = useState(null)
 
-  const activeTorneoRef = useRef(null)
-  const llavesRef = useRef([])
+  const unsubZonasRef = useRef(null)
+  const unsubPartidosRef = useRef(null)
+  const unsubLlavesRef = useRef(null)
 
-  useEffect(() => { activeTorneoRef.current = activeTorneo }, [activeTorneo])
-  useEffect(() => { llavesRef.current = llaves }, [llaves])
   useEffect(() => { loadTorneos() }, [])
 
+  // Live-subscribed instead of one-time getDocs: two admins/colaboradores can
+  // have this screen open at once, and results loaded elsewhere (or a bracket
+  // regenerated from TorneosAdmin) need to show up here without a manual refresh.
   useEffect(() => {
-    if (activeTorneoId) { loadData(activeTorneoId); setOpenIds([]) }
+    if (!activeTorneoId) return
+    setOpenIds([])
+    setLoading(true)
+    setFilterZona('all'); setFilterJornada('all'); setFilterEstado('all')
+    setPage(1)
+    // A pending "generate bracket?" prompt belongs to whichever tournament was
+    // active when it fired — it must not follow the admin to a different tab.
+    setPendingAutoLlave(null)
+    // Clear out the previous tournament's data immediately — otherwise it lingers
+    // (mismatched against the new activeTorneoId) until the new listeners fire,
+    // which could feed stale data into the "all matches done" check below.
+    setZonas([]); setPartidos([]); setLlaves([])
+
+    if (unsubZonasRef.current) { unsubZonasRef.current(); unsubZonasRef.current = null }
+    if (unsubPartidosRef.current) { unsubPartidosRef.current(); unsubPartidosRef.current = null }
+    if (unsubLlavesRef.current) { unsubLlavesRef.current(); unsubLlavesRef.current = null }
+
+    // Tracked locally to THIS subscription (not via React state/useEffect deps):
+    // when switching tournaments, a separate effect reacting to `partidos`/`llaves`
+    // state can run with the previous tournament's still-stale values before this
+    // effect's own resets are reflected in a new render, incorrectly flagging the
+    // newly-selected tournament as "ready for a bracket". These closures are
+    // recreated fresh per activeTorneoId, so there's no cross-tournament mix-up.
+    const torneoIdForThisSubscription = activeTorneoId
+    let latestPartidos = []
+    let latestLlaves = []
+    function checkAllPartidosDone() {
+      if (latestPartidos.length === 0) return
+      const allDone = latestPartidos.every(p => p.estado === 'Finalizado' || p.estado === 'W.O.')
+      if (allDone && latestLlaves.length === 0) setPendingAutoLlave(torneoIdForThisSubscription)
+    }
+
+    unsubZonasRef.current = onSnapshot(
+      query(collection(db, 'torneos', activeTorneoId, 'zonas'), orderBy('orden')),
+      snap => setZonas(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    )
+
+    let firstPartidos = true
+    unsubPartidosRef.current = onSnapshot(
+      collection(db, 'torneos', activeTorneoId, 'partidos'),
+      snap => {
+        latestPartidos = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        setPartidos(latestPartidos)
+        if (firstPartidos) { setLoading(false); firstPartidos = false }
+        checkAllPartidosDone()
+      },
+      () => setLoading(false)
+    )
+
+    // Only auto-pick the view mode ('grupos' vs 'llave') on the first snapshot for
+    // this tournament — after that, later score updates shouldn't yank the admin's
+    // manually-selected tab back.
+    let firstLlaves = true
+    unsubLlavesRef.current = onSnapshot(
+      collection(db, 'torneos', activeTorneoId, 'llaves'),
+      snap => {
+        latestLlaves = snap.docs
+          .map(d => ({ id: d.id, ...d.data() }))
+          .sort((a, b) => (a.round ?? 0) - (b.round ?? 0) || (a.matchIndex ?? 0) - (b.matchIndex ?? 0))
+        setLlaves(latestLlaves)
+        if (firstLlaves) { setViewMode(latestLlaves.length > 0 ? 'llave' : 'grupos'); firstLlaves = false }
+        checkAllPartidosDone()
+      }
+    )
+
+    return () => {
+      if (unsubZonasRef.current) { unsubZonasRef.current(); unsubZonasRef.current = null }
+      if (unsubPartidosRef.current) { unsubPartidosRef.current(); unsubPartidosRef.current = null }
+      if (unsubLlavesRef.current) { unsubLlavesRef.current(); unsubLlavesRef.current = null }
+    }
   }, [activeTorneoId])
 
   async function loadTorneos() {
@@ -871,62 +1001,32 @@ export default function PartidosAdmin() {
     }
   }
 
-  async function loadLlaves(torneoId) {
-    const snap = await getDocs(collection(db, 'torneos', torneoId, 'llaves'))
-    const data = snap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => (a.round ?? 0) - (b.round ?? 0) || (a.matchIndex ?? 0) - (b.matchIndex ?? 0))
-    setLlaves(data)
-    llavesRef.current = data
-    return data
+  function handleUpdated(updated) {
+    setPartidos(prev => prev.map(p => p.id === updated.id ? updated : p))
   }
 
-  async function loadData(torneoId) {
-    setLoading(true)
-    const [zonasSnap, partidosSnap] = await Promise.all([
-      getDocs(query(collection(db, 'torneos', torneoId, 'zonas'), orderBy('orden'))),
-      getDocs(collection(db, 'torneos', torneoId, 'partidos')),
-    ])
-    setZonas(zonasSnap.docs.map(d => ({ id: d.id, ...d.data() })))
-    setPartidos(partidosSnap.docs.map(d => ({ id: d.id, ...d.data() })))
-    setFilterZona('all'); setFilterJornada('all'); setFilterEstado('all')
-    setPage(1)
-
-    const llavesData = await loadLlaves(torneoId)
-    setViewMode(llavesData.length > 0 ? 'llave' : 'grupos')
-    setLoading(false)
-  }
-
-  async function handleUpdated(updated) {
-    let allDone = false
-    setPartidos(prev => {
-      const next = prev.map(p => p.id === updated.id ? updated : p)
-      allDone = next.length > 0 && next.every(p => p.estado === 'Finalizado' || p.estado === 'W.O.')
-      return next
-    })
-
-    if (allDone && llavesRef.current.length === 0) {
-      const tid = activeTorneoRef.current?.id
-      if (!tid) return
-      setGeneratingAutoLlave(true)
-      try {
-        await generateBracket(tid)
-        const llavesData = await loadLlaves(tid)
-        if (llavesData.length > 0) setViewMode('llave')
-        setActiveTorneo(prev => prev ? { ...prev, estado: 'Llave' } : prev)
-        setAutoLlaveMsg('¡Todos los partidos finalizados! La llave fue generada automáticamente.')
-      } catch (err) {
-        setAutoLlaveMsg('Error al generar la llave: ' + (err.message || 'Error desconocido'))
-      }
-      setGeneratingAutoLlave(false)
+  async function handleConfirmAutoLlave() {
+    const tid = pendingAutoLlave
+    if (!tid) return
+    setPendingAutoLlave(null)
+    setGeneratingAutoLlave(true)
+    try {
+      await generateBracket(tid)
+      setViewMode('llave')
+      setActiveTorneo(prev => prev ? { ...prev, estado: 'Llave' } : prev)
+      // Keeps the public side (TorneoContext) in sync — otherwise its `torneos`
+      // list only refetches on a full page reload, and things gated on
+      // torneo.estado (like the bracket tab even existing) stay stale.
+      refreshTorneos()
+      setAutoLlaveMsg('¡Listo! La llave fue generada.')
+    } catch (err) {
+      setAutoLlaveMsg('Error al generar la llave: ' + (err.message || 'Error desconocido'))
     }
+    setGeneratingAutoLlave(false)
   }
 
-  async function handleLlaveUpdated(updated) {
+  function handleLlaveUpdated(updated) {
     setLlaves(prev => prev.map(l => l.id === updated.id ? updated : l))
-    if (activeTorneoRef.current?.id) {
-      await loadLlaves(activeTorneoRef.current.id)
-    }
   }
 
   function toggleOpen(id) {
@@ -962,6 +1062,12 @@ export default function PartidosAdmin() {
     }))
   }, [llaves])
 
+  // Which rounds play a full 3rd set is configurable per tournament
+  // (tercerSetDesde), counted backwards from the final so it works regardless
+  // of how many total rounds this particular bracket has.
+  const maxRound = rounds.length > 0 ? rounds[rounds.length - 1].round : 0
+  const tercerSetOffset = ROUND_OFFSET_FROM_FINAL[activeTorneo?.tercerSetDesde] ?? ROUND_OFFSET_FROM_FINAL.semifinal
+
   return (
     <div>
       <div style={{ marginBottom: 20 }}>
@@ -983,11 +1089,21 @@ export default function PartidosAdmin() {
         </div>
       )}
 
+      {pendingAutoLlave && pendingAutoLlave === activeTorneoId && (
+        <div className="pa-alert pa-alert-prompt">
+          <span className="pa-alert-text">🏅 ¡Todos los partidos de grupos terminaron! ¿Generar la llave ahora?</span>
+          <div className="pa-alert-actions">
+            <button onClick={() => setPendingAutoLlave(null)} className="pa-alert-btn-ghost">Todavía no</button>
+            <button onClick={handleConfirmAutoLlave} className="pa-alert-btn-solid">Generar llave</button>
+          </div>
+        </div>
+      )}
+
       {generatingAutoLlave && (
         <div className="pa-alert">
           <span className="pa-alert-text">
             <span className="pa-alert-spinner" />
-            Generando llave automáticamente...
+            Generando llave...
           </span>
         </div>
       )}
@@ -1093,6 +1209,7 @@ export default function PartidosAdmin() {
                         key={m.id}
                         match={m}
                         torneoId={activeTorneo.id}
+                        modalidad={activeTorneo.modalidadTorneo}
                         onUpdated={handleUpdated}
                         open={openIds.includes(m.id)}
                         onToggle={() => toggleOpen(m.id)}
@@ -1148,6 +1265,8 @@ export default function PartidosAdmin() {
                         key={l.id}
                         llave={l}
                         torneoId={activeTorneo.id}
+                        modalidad={activeTorneo.modalidadTorneo}
+                        allowThirdSet={maxRound - round <= tercerSetOffset}
                         onUpdated={handleLlaveUpdated}
                       />
                     ))}

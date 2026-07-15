@@ -5,11 +5,12 @@
 .td-header-inner { max-width: 1280px; margin: 0 auto; }
 .td-name-row { display: flex; align-items: center; gap: 10px; }
 .td-back-btn {
-  background: rgba(255,255,255,0.05); border: 1px solid #2a2a38; border-radius: 7px;
-  color: #9999b0; font-size: 12px; padding: 5px 11px; cursor: pointer; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.05); border: 1px solid #2a2a38; border-radius: 8px;
+  color: #d0d0dc; font-size: 13px; font-weight: 600; padding: 7px 14px; cursor: pointer; flex-shrink: 0;
   transition: all 0.15s;
 }
-.td-back-btn:hover { color: #f1f1f5; border-color: #3a3a50; }
+.td-back-btn:hover { color: #f1f1f5; border-color: #f97316; background: rgba(249,115,22,0.08); }
 .td-torneo-name {
   color: #f1f1f5; font-weight: 700; margin: 0; flex: 1; min-width: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: -0.3px;

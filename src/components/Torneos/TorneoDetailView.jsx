@@ -62,7 +62,12 @@ export default function TorneoDetailView() {
       <div className="td-sticky-header">
         <div className="td-header-inner" style={{ padding: isMobile ? '12px 14px 0' : '14px 24px 0' }}>
           <div className="td-name-row" style={{ marginBottom: isMobile ? 12 : 10 }}>
-            <button onClick={() => navigate('/torneos')} className="td-back-btn">← Torneos</button>
+            <button onClick={() => navigate('/torneos')} className="td-back-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+              Volver a torneos
+            </button>
             {activeTorneo && (
               <>
                 <h2 className="td-torneo-name" style={{ fontSize: isMobile ? 15 : 18 }}>{activeTorneo.nombre}</h2>

@@ -1,8 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { collection, getDocs, query, orderBy, where } from 'firebase/firestore'
 import { db } from '../../firebase/config'
-import { createTorneo, updateTorneo, deleteTorneo, addDupla, generateFixture, generateBracket, updateColaboradores } from '../../firebase/torneoService'
+import {
+  createTorneo, updateTorneo, deleteTorneo, addDupla, generateFixture, generateBracket, deleteBracket, deleteFixture,
+  updateColaboradores, updateTorneoEstado, getPremioInfo, addGasto, deleteGasto, updateRepartoCampeon,
+} from '../../firebase/torneoService'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTorneo } from '../../contexts/TorneoContext'
 import Spinner from '../ui/Spinner'
 import AppSelect from '../ui/AppSelect'
 import { useIsMobile } from '../../hooks/useIsMobile'
@@ -21,12 +25,26 @@ const CAT_OPTIONS = [
   { id: 'cat-mix', name: 'Mixto',          valor: 3, color: '#f59e0b' },
 ]
 
+const TERCER_SET_OPTIONS = [
+  { v: 'octavos',   label: 'Octavos' },
+  { v: 'cuartos',   label: 'Cuartos' },
+  { v: 'semifinal', label: 'Semis' },
+  { v: 'final',     label: 'Final' },
+]
+
 const STATUS_STYLE = {
   'En curso':    { bg: 'rgba(34,197,94,0.12)',   color: '#22c55e', border: 'rgba(34,197,94,0.25)' },
   'Inscripción': { bg: 'rgba(249,115,22,0.12)',  color: '#f97316', border: 'rgba(249,115,22,0.25)' },
   'Finalizado':  { bg: 'rgba(156,163,175,0.12)', color: '#9ca3af', border: 'rgba(156,163,175,0.25)' },
   'Llave':       { bg: 'rgba(139,92,246,0.12)',  color: '#8b5cf6', border: 'rgba(139,92,246,0.25)' },
 }
+
+const ESTADO_OPTIONS = [
+  { value: 'Inscripción', label: 'Inscripción' },
+  { value: 'En curso',    label: 'En curso' },
+  { value: 'Llave',       label: 'Llave' },
+  { value: 'Finalizado',  label: 'Finalizado' },
+]
 
 function getTorneoColor(t) {
   if (t.color) return t.color
@@ -385,7 +403,7 @@ function NewTorneoModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
     nombre: '', tipoTorneo: 'categoria', modalidadTorneo: 'tradicional', categoriaId: 'cat-8va',
     sumaValor: '', fechaInicio: '', fechaFin: '', costoPorJugador: '', sexo: 'masculino',
-    tamanoZona: 4, clasificadosPorZona: 1,
+    tamanoZona: 4, clasificadosPorZona: 1, tercerSetDesde: 'semifinal',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -430,6 +448,7 @@ function NewTorneoModal({ onClose, onCreated }) {
       sexo: form.sexo,
       tamanoZona: form.tamanoZona,
       clasificadosPorZona: form.clasificadosPorZona,
+      tercerSetDesde: form.tercerSetDesde,
       ownerUid: user?.uid || null,
       ownerEmail: user?.email || null,
     })
@@ -552,6 +571,18 @@ function NewTorneoModal({ onClose, onCreated }) {
             </div>
           </div>
 
+          {form.modalidadTorneo === 'tradicional' && (
+            <div className="ta-field">
+              <label className="ta-label">3er set desde</label>
+              <div className="ta-toggle-group">
+                {TERCER_SET_OPTIONS.map(({ v, label }) => (
+                  <button key={v} type="button" className={`ta-toggle${form.tercerSetDesde === v ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, tercerSetDesde: v }))}>{label}</button>
+                ))}
+              </div>
+              <p className="ta-suma-note">Antes de esa ronda, un 1-1 en sets se define con súper tiebreak en vez de un 3er set completo.</p>
+            </div>
+          )}
+
           <div
             className="ta-preview-bar"
             style={{ background: `${previewColor}10`, border: `1px solid ${previewColor}30` }}
@@ -593,6 +624,7 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
     sexo: torneo.sexo || 'masculino',
     tamanoZona: torneo.tamanoZona || 4,
     clasificadosPorZona: torneo.clasificadosPorZona || 1,
+    tercerSetDesde: torneo.tercerSetDesde || 'semifinal',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -625,6 +657,7 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
       color, sexo: form.sexo,
       tamanoZona: form.tamanoZona,
       clasificadosPorZona: form.clasificadosPorZona,
+      tercerSetDesde: form.tercerSetDesde,
     })
     setSaving(false)
     onSaved()
@@ -717,6 +750,17 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
               </div>
             </div>
           </div>
+          {form.modalidadTorneo === 'tradicional' && (
+            <div className="ta-field">
+              <label className="ta-label">3er set desde</label>
+              <div className="ta-toggle-group">
+                {TERCER_SET_OPTIONS.map(({ v, label }) => (
+                  <button key={v} type="button" className={`ta-toggle${form.tercerSetDesde === v ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, tercerSetDesde: v }))}>{label}</button>
+                ))}
+              </div>
+              <p className="ta-suma-note">Antes de esa ronda, un 1-1 en sets se define con súper tiebreak en vez de un 3er set completo.</p>
+            </div>
+          )}
           <div
             className="ta-preview-bar"
             style={{ background: `${previewColor}10`, border: `1px solid ${previewColor}30` }}
@@ -737,6 +781,134 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
             </button>
           </div>
         </form>
+      </div>
+    </div>
+  )
+}
+
+// Prize transparency — admin-only for now (a public breakdown view comes later).
+// recaudado comes from confirmed dupla payments, not a hand-typed total, so it
+// can't drift out of sync with what's actually been collected.
+function PremiosSection({ torneo }) {
+  const [info, setInfo] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [descripcion, setDescripcion] = useState('')
+  const [monto, setMonto] = useState('')
+  const [savingGasto, setSavingGasto] = useState(false)
+  const [reparto, setReparto] = useState(70)
+  const [savingReparto, setSavingReparto] = useState(false)
+
+  async function load() {
+    setLoading(true)
+    const data = await getPremioInfo(torneo.id)
+    setInfo(data)
+    setReparto(data.repartoCampeonPct)
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [torneo.id])
+
+  async function handleAddGasto() {
+    if (!descripcion.trim() || !monto) return
+    setSavingGasto(true)
+    await addGasto(torneo.id, { descripcion, monto })
+    setDescripcion(''); setMonto('')
+    await load()
+    setSavingGasto(false)
+  }
+
+  async function handleDeleteGasto(id) {
+    await deleteGasto(torneo.id, id)
+    await load()
+  }
+
+  async function handleSaveReparto() {
+    setSavingReparto(true)
+    await updateRepartoCampeon(torneo.id, reparto)
+    await load()
+    setSavingReparto(false)
+  }
+
+  return (
+    <div style={{ marginBottom: 24 }}>
+      <div className="ta-section-heading">Premios <span style={{ color: '#6666a0', fontWeight: 400, textTransform: 'none' }}>(solo admin, por ahora)</span></div>
+      <div style={{ background: '#13131a', border: '1px solid #2a2a38', borderRadius: 10, padding: '14px 16px' }}>
+        {loading || !info ? <Spinner /> : (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 10, marginBottom: 16 }}>
+              <div>
+                <div style={{ color: '#f1f1f5', fontSize: 18, fontWeight: 700 }}>${info.recaudado.toLocaleString()}</div>
+                <div style={{ color: '#6666a0', fontSize: 11 }}>Recaudado</div>
+              </div>
+              <div>
+                <div style={{ color: '#ef4444', fontSize: 18, fontWeight: 700 }}>${info.totalGastos.toLocaleString()}</div>
+                <div style={{ color: '#6666a0', fontSize: 11 }}>Gastos</div>
+              </div>
+              <div>
+                <div style={{ color: '#22c55e', fontSize: 18, fontWeight: 700 }}>${info.premioNeto.toLocaleString()}</div>
+                <div style={{ color: '#6666a0', fontSize: 11 }}>Premio neto</div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 16, padding: '10px 12px', background: '#1a1a24', borderRadius: 8, border: '1px solid #2a2a38' }}>
+              <span style={{ color: '#9999b0', fontSize: 12 }}>Reparto campeón</span>
+              <input
+                type="number" min="0" max="100" value={reparto}
+                onChange={e => setReparto(e.target.value)}
+                style={{ width: 56, background: '#0f0f13', border: '1px solid #2a2a38', borderRadius: 6, padding: '5px 8px', color: '#f1f1f5', fontSize: 13, outline: 'none' }}
+              />
+              <span style={{ color: '#9999b0', fontSize: 12 }}>%</span>
+              {Number(reparto) !== info.repartoCampeonPct && (
+                <button
+                  onClick={handleSaveReparto}
+                  disabled={savingReparto}
+                  style={{ background: 'rgba(249,115,22,0.12)', border: '1px solid rgba(249,115,22,0.3)', borderRadius: 6, color: '#f97316', fontSize: 11, fontWeight: 600, padding: '5px 10px', cursor: 'pointer' }}
+                >{savingReparto ? '...' : 'Guardar'}</button>
+              )}
+              <span style={{ color: '#6666a0', fontSize: 12, marginLeft: 'auto' }}>
+                🥇 ${info.montoCampeon.toLocaleString()} · 🥈 ${info.montoSubcampeon.toLocaleString()}
+              </span>
+            </div>
+
+            {info.gastos.length > 0 && (
+              <div style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {info.gastos.map(g => (
+                  <div key={g.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: '#1a1a24', borderRadius: 6, border: '1px solid #2a2a38' }}>
+                    <span style={{ color: '#f1f1f5', fontSize: 13 }}>{g.descripcion}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ color: '#ef4444', fontSize: 13, fontWeight: 600 }}>${Number(g.monto).toLocaleString()}</span>
+                      <button
+                        onClick={() => handleDeleteGasto(g.id)}
+                        style={{ background: 'rgba(239,68,68,0.08)', border: 'none', borderRadius: 6, color: '#ef4444', fontSize: 11, padding: '3px 10px', cursor: 'pointer' }}
+                      >Quitar</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input
+                placeholder="Ej. Trofeos, pelotitas..." value={descripcion} onChange={e => setDescripcion(e.target.value)}
+                style={{ flex: '1 1 180px', background: '#0f0f13', border: '1px solid #2a2a38', borderRadius: 6, padding: '7px 10px', color: '#f1f1f5', fontSize: 13, outline: 'none' }}
+              />
+              <input
+                type="number" placeholder="Monto" value={monto} onChange={e => setMonto(e.target.value)}
+                style={{ width: 100, background: '#0f0f13', border: '1px solid #2a2a38', borderRadius: 6, padding: '7px 10px', color: '#f1f1f5', fontSize: 13, outline: 'none' }}
+              />
+              <button
+                onClick={handleAddGasto}
+                disabled={savingGasto || !descripcion.trim() || !monto}
+                style={{
+                  background: descripcion.trim() && monto ? 'rgba(249,115,22,0.12)' : 'rgba(255,255,255,0.04)',
+                  border: `1px solid ${descripcion.trim() && monto ? 'rgba(249,115,22,0.3)' : '#2a2a38'}`,
+                  borderRadius: 6, color: descripcion.trim() && monto ? '#f97316' : '#6666a0',
+                  fontSize: 12, fontWeight: 600, padding: '7px 14px', cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >{savingGasto ? '...' : '+ Agregar gasto'}</button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
@@ -849,6 +1021,7 @@ function ColaboradoresSection({ torneo, currentUserUid, isOwner, onUpdate }) {
 
 export default function TorneosAdmin() {
   const { user, isMaster } = useAuth()
+  const { refreshTorneos } = useTorneo()
   const [torneos, setTorneos] = useState([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState(null)
@@ -861,8 +1034,23 @@ export default function TorneosAdmin() {
   const [generatingFixture, setGeneratingFixture] = useState(false)
   const [llaveConfirm, setLlaveConfirm] = useState(null)
   const [generatingLlave, setGeneratingLlave] = useState(false)
+  const [deleteLlaveConfirm, setDeleteLlaveConfirm] = useState(null)
+  const [deletingLlave, setDeletingLlave] = useState(false)
+  const [llavesCount, setLlavesCount] = useState(0)
+  const [deleteFixtureConfirm, setDeleteFixtureConfirm] = useState(null)
+  const [deletingFixture, setDeletingFixture] = useState(false)
+  const [zonasCount, setZonasCount] = useState(0)
+  const [updatingEstado, setUpdatingEstado] = useState(false)
 
   useEffect(() => { if (user) load() }, [user?.uid, isMaster])
+
+  useEffect(() => {
+    if (!selected) { setLlavesCount(0); setZonasCount(0); return }
+    getDocs(collection(db, 'torneos', selected.id, 'llaves'))
+      .then(snap => setLlavesCount(snap.size))
+    getDocs(collection(db, 'torneos', selected.id, 'zonas'))
+      .then(snap => setZonasCount(snap.size))
+  }, [selected?.id])
 
   async function load() {
     setLoading(true)
@@ -876,6 +1064,7 @@ export default function TorneosAdmin() {
     setTorneos(list)
     setSelected(prev => prev ? (list.find(t => t.id === prev.id) ?? null) : null)
     setLoading(false)
+    refreshTorneos()
   }
 
   async function handleDelete(id) {
@@ -890,6 +1079,9 @@ export default function TorneosAdmin() {
   async function handleGenerateFixture(torneoId) {
     setGeneratingFixture(true)
     await generateFixture(torneoId)
+    const zonasSnap = await getDocs(collection(db, 'torneos', torneoId, 'zonas'))
+    setZonasCount(zonasSnap.size)
+    setLlavesCount(0)
     setGeneratingFixture(false)
     setFixtureConfirm(null)
     load()
@@ -899,11 +1091,39 @@ export default function TorneosAdmin() {
     setGeneratingLlave(true)
     try {
       await generateBracket(torneoId)
+      const llavesSnap = await getDocs(collection(db, 'torneos', torneoId, 'llaves'))
+      setLlavesCount(llavesSnap.size)
     } catch (err) {
       alert(err.message || 'Error al generar la llave.')
     }
     setGeneratingLlave(false)
     setLlaveConfirm(null)
+    load()
+  }
+
+  async function handleDeleteLlave(torneoId) {
+    setDeletingLlave(true)
+    await deleteBracket(torneoId)
+    setDeletingLlave(false)
+    setDeleteLlaveConfirm(null)
+    setLlavesCount(0)
+    load()
+  }
+
+  async function handleDeleteFixture(torneoId) {
+    setDeletingFixture(true)
+    await deleteFixture(torneoId)
+    setDeletingFixture(false)
+    setDeleteFixtureConfirm(null)
+    setZonasCount(0)
+    setLlavesCount(0)
+    load()
+  }
+
+  async function handleEstadoChange(torneoId, estado) {
+    setUpdatingEstado(true)
+    await updateTorneoEstado(torneoId, estado)
+    setUpdatingEstado(false)
     load()
   }
 
@@ -925,17 +1145,14 @@ export default function TorneosAdmin() {
         (() => {
           const t = selected
           const col = getTorneoColor(t)
-          const st = STATUS_STYLE[t.estado] || STATUS_STYLE['Inscripción']
           const sexoLabel = { masculino: '♂ Masculino', femenino: '♀ Femenino', mixto: '⊕ Mixto' }[t.sexo] || t.sexo
           return (
             <div>
-              <button
-                onClick={() => setSelected(null)}
-                className="ta-back-btn"
-                onMouseEnter={e => e.currentTarget.style.color = '#f1f1f5'}
-                onMouseLeave={e => e.currentTarget.style.color = '#9999b0'}
-              >
-                ← Torneos
+              <button onClick={() => setSelected(null)} className="ta-back-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M15 18l-6-6 6-6" />
+                </svg>
+                Volver a torneos
               </button>
 
               <div className="ta-detail-header">
@@ -945,12 +1162,14 @@ export default function TorneosAdmin() {
                     <h2 className="ta-detail-title">{t.nombre}</h2>
                   </div>
                   <div className="ta-detail-actions">
-                    <span
-                      className="ta-status-badge"
-                      style={{ background: st.bg, color: st.color, border: `1px solid ${st.border}` }}
-                    >
-                      {t.estado}
-                    </span>
+                    <AppSelect
+                      value={t.estado}
+                      onChange={v => handleEstadoChange(t.id, v)}
+                      isDisabled={updatingEstado}
+                      options={ESTADO_OPTIONS}
+                      size="sm"
+                      minWidth={140}
+                    />
                     <button
                       onClick={() => setEditModal(t)}
                       style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid #2a2a38', borderRadius: 8, color: '#9999b0', fontSize: 12, padding: '6px 14px', cursor: 'pointer', transition: 'all 0.15s' }}
@@ -1006,7 +1225,7 @@ export default function TorneosAdmin() {
                   <div className="ta-action-card-title" style={{ color: '#8b5cf6' }}>Generar fixture</div>
                   <div className="ta-action-card-desc">Crear zonas y cruces automáticamente</div>
                 </button>
-                {t.estado === 'Llave' && (
+                {zonasCount > 0 && (
                   <button
                     onClick={() => setLlaveConfirm(t)}
                     className="ta-action-card"
@@ -1015,11 +1234,43 @@ export default function TorneosAdmin() {
                     onMouseLeave={e => { e.currentTarget.style.background = '#13131a'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.3)' }}
                   >
                     <div className="ta-action-card-icon">🏅</div>
-                    <div className="ta-action-card-title" style={{ color: '#10b981' }}>Regenerar llave</div>
-                    <div className="ta-action-card-desc">Reconstruir bracket de eliminación</div>
+                    <div className="ta-action-card-title" style={{ color: '#10b981' }}>{llavesCount > 0 ? 'Regenerar llave' : 'Generar llave'}</div>
+                    <div className="ta-action-card-desc">
+                      {llavesCount > 0 ? 'Reconstruir bracket de eliminación' : 'Armar cruces con los 1° y 2° de cada zona (por si no se generó sola)'}
+                    </div>
+                  </button>
+                )}
+                {llavesCount > 0 && (
+                  <button
+                    onClick={() => setDeleteLlaveConfirm(t)}
+                    className="ta-action-card"
+                    style={{ border: '1px solid rgba(239,68,68,0.3)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.borderColor = '#ef4444' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#13131a'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)' }}
+                  >
+                    <div className="ta-action-card-icon">🗑</div>
+                    <div className="ta-action-card-title" style={{ color: '#ef4444' }}>Eliminar llave</div>
+                    <div className="ta-action-card-desc">
+                      {t.estado === 'Llave' ? 'Borrar el bracket y volver a fase de grupos' : `Hay ${llavesCount} partido(s) de llave sin usar — borrarlos`}
+                    </div>
+                  </button>
+                )}
+                {zonasCount > 0 && (
+                  <button
+                    onClick={() => setDeleteFixtureConfirm(t)}
+                    className="ta-action-card"
+                    style={{ border: '1px solid rgba(239,68,68,0.3)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.08)'; e.currentTarget.style.borderColor = '#ef4444' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#13131a'; e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)' }}
+                  >
+                    <div className="ta-action-card-icon">🗑</div>
+                    <div className="ta-action-card-title" style={{ color: '#ef4444' }}>Eliminar fixture</div>
+                    <div className="ta-action-card-desc">Borrar zonas, partidos y llave — vuelve a Inscripción</div>
                   </button>
                 )}
               </div>
+
+              <PremiosSection torneo={t} />
 
               <ColaboradoresSection
                 torneo={t}
@@ -1163,6 +1414,38 @@ export default function TorneosAdmin() {
               <button onClick={() => setLlaveConfirm(null)} disabled={generatingLlave} className="ta-btn-secondary">Cancelar</button>
               <button onClick={() => handleGenerateLlave(llaveConfirm.id)} disabled={generatingLlave} className="ta-btn-green" style={{ cursor: generatingLlave ? 'wait' : 'pointer', opacity: generatingLlave ? 0.7 : 1 }}>
                 {generatingLlave ? 'Generando...' : '🏅 Generar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteLlaveConfirm && (
+        <div className="ta-modal-overlay" style={{ zIndex: 1200 }}>
+          <div className="ta-confirm-modal">
+            <div className="ta-confirm-icon">🗑</div>
+            <h3 className="ta-confirm-title">¿Eliminar llave?</h3>
+            <p className="ta-confirm-name"><strong style={{ color: '#f1f1f5' }}>{deleteLlaveConfirm.nombre}</strong></p>
+            <p className="ta-confirm-error">Se borrará el bracket completo y el torneo vuelve a fase de grupos ("En curso"). Los resultados de la fase de grupos no se ven afectados.</p>
+            <div className="ta-confirm-actions">
+              <button onClick={() => setDeleteLlaveConfirm(null)} disabled={deletingLlave} className="ta-btn-secondary">Cancelar</button>
+              <button onClick={() => handleDeleteLlave(deleteLlaveConfirm.id)} disabled={deletingLlave} className="ta-btn-danger" style={{ cursor: deletingLlave ? 'wait' : 'pointer', opacity: deletingLlave ? 0.7 : 1 }}>
+                {deletingLlave ? 'Eliminando...' : 'Eliminar llave'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {deleteFixtureConfirm && (
+        <div className="ta-modal-overlay" style={{ zIndex: 1200 }}>
+          <div className="ta-confirm-modal">
+            <div className="ta-confirm-icon">🗑</div>
+            <h3 className="ta-confirm-title">¿Eliminar fixture?</h3>
+            <p className="ta-confirm-name"><strong style={{ color: '#f1f1f5' }}>{deleteFixtureConfirm.nombre}</strong></p>
+            <p className="ta-confirm-error">Se borran las zonas, todos los partidos (con sus resultados) y la llave si existía. El torneo vuelve a estado "Inscripción". Esta acción no se puede deshacer.</p>
+            <div className="ta-confirm-actions">
+              <button onClick={() => setDeleteFixtureConfirm(null)} disabled={deletingFixture} className="ta-btn-secondary">Cancelar</button>
+              <button onClick={() => handleDeleteFixture(deleteFixtureConfirm.id)} disabled={deletingFixture} className="ta-btn-danger" style={{ cursor: deletingFixture ? 'wait' : 'pointer', opacity: deletingFixture ? 0.7 : 1 }}>
+                {deletingFixture ? 'Eliminando...' : 'Eliminar fixture'}
               </button>
             </div>
           </div>

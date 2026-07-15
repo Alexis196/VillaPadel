@@ -293,20 +293,27 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: transparent;
-  border: none;
-  color: #9999b0;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid #2a2a38;
+  border-radius: 8px;
+  color: #d0d0dc;
   cursor: pointer;
   font-size: 13px;
-  padding: 4px 0;
+  font-weight: 600;
+  padding: 7px 14px;
   margin-bottom: 20px;
+  transition: all 0.15s;
+}
+.ta-back-btn:hover {
+  color: #f1f1f5;
+  border-color: #f97316;
+  background: rgba(249,115,22,0.08);
 }
 .ta-detail-header { margin-bottom: 24px; }
 .ta-detail-title { color: #f1f1f5; font-size: 22px; font-weight: 700; margin: 0 0 8px; }
 .ta-detail-accent { height: 3px; width: 36px; border-radius: 2px; margin-bottom: 10px; }
 .ta-detail-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .ta-detail-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.ta-status-badge { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
 .ta-americano-badge {
   padding: 3px 10px;
   border-radius: 20px;

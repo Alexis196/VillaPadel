@@ -794,6 +794,11 @@ body {
    MOBILE
 ═══════════════════════════════════════════════════ */
 @media (max-width: 639px) {
+  /* iOS Safari zooms the whole page in when a focused input/select/textarea
+     has a font-size under 16px — this forces every form field back to 16px
+     on phone-width viewports so tapping a field doesn't trigger that zoom. */
+  input, select, textarea { font-size: 16px !important; }
+
   body { padding-bottom: env(safe-area-inset-bottom, 0px); }
 
   .has-bottom-nav { padding-bottom: 66px !important; }

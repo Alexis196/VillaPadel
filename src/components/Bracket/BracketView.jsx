@@ -53,9 +53,9 @@ function MatchCard({ llave, isAdmin, onEdit }) {
           {canEdit && <span className="bv-edit-icon">✎</span>}
         </div>
       </div>
-      <TeamRow team={llave.duplaA} pts={played ? llave.ptsA : null} isWinner={winnerA} />
+      <TeamRow team={llave.duplaA} pts={played ? llave.resultado?.setsA : null} isWinner={winnerA} />
       <div className="bv-row-divider" />
-      <TeamRow team={llave.duplaB} pts={played ? llave.ptsB : null} isWinner={winnerB} />
+      <TeamRow team={llave.duplaB} pts={played ? llave.resultado?.setsB : null} isWinner={winnerB} />
     </div>
   )
 }

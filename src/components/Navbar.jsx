@@ -10,6 +10,7 @@ const navItems = [
   { to: '/',               label: 'Inicio',         icon: '🏠', end: true },
   { to: '/torneos',        label: 'Torneos',         icon: '🏆', end: false },
   { to: '/categorizacion', label: 'Categorización',  icon: '👤', end: false },
+  { to: '/campeones',      label: 'Campeones',       icon: '🥇', end: false },
 ]
 
 function UserMenu({ user, isAdmin }) {

@@ -166,7 +166,7 @@
 }
 
 /* Confirm delete modal */
-.da-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 2000; }
+.da-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 2000; padding: 20px; box-sizing: border-box; }
 .da-modal {
   background: #1a1a22; border: 1px solid #2a2a38; border-radius: 12px;
   padding: 24px 28px; width: 100%; max-width: 360px;
