@@ -1,0 +1,52 @@
+/* ─── InstallPrompt.css ─── */
+
+.ip-banner {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  right: 0;
+  z-index: 250;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(13,17,32,0.97);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(249,115,22,0.25);
+  padding: 10px 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  animation: ip-slide-down 0.25s ease;
+}
+@keyframes ip-slide-down {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.ip-icon { width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0; }
+.ip-text { flex: 1; min-width: 0; }
+.ip-title { color: #f1f1f5; font-size: 13px; font-weight: 700; }
+.ip-desc { color: #9999b0; font-size: 11px; margin-top: 1px; line-height: 1.4; }
+
+.ip-btn-install {
+  background: #f97316;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.ip-btn-close {
+  background: transparent;
+  border: none;
+  color: #6666a0;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 4px 2px;
+}

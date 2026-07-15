@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import Navbar from './components/Navbar'
+import InstallPrompt from './components/InstallPrompt'
 import LandingView from './components/Landing/LandingView'
 import TorneosListView from './components/Torneos/TorneosListView'
 import TorneoDetailView from './components/Torneos/TorneoDetailView'
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="/*" element={
             <>
               <Navbar />
+              <InstallPrompt />
               <main>
                 <Routes>
                   <Route path="/" element={<LandingView />} />
