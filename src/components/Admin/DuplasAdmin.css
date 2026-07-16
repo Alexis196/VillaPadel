@@ -147,16 +147,17 @@
 .da-edit-row { padding: 12px 16px; background: rgba(249,115,22,0.04); border-top: 1px solid #2a2a38; }
 .da-edit-player-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .da-edit-j-label { font-size: 11px; font-weight: 700; width: 20px; flex-shrink: 0; }
-.da-edit-player-name { color: #9999b0; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.da-edit-name-input { flex: 1; min-width: 0; }
 .da-edit-pago-row-mobile { display: flex; gap: 4px; padding-left: 26px; }
 .da-edit-pago-row-desktop { display: flex; align-items: center; gap: 8px; }
-.da-edit-player-name-desktop { color: #9999b0; font-size: 12px; width: 130px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.da-edit-name-input-desktop { width: 130px; flex-shrink: 0; }
 .da-save-btn {
   background: #22c55e; color: #fff; border: none;
   border-radius: 6px; padding: 5px 16px;
   font-size: 12px; font-weight: 600; margin-top: 8px;
 }
 .da-save-btn:disabled { opacity: 0.7; cursor: wait; }
+.da-edit-error { color: #ef4444; font-size: 12px; margin: 8px 0 0; }
 
 /* Form input */
 .da-inp {

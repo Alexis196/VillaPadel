@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { collection, getDocs, query, orderBy } from 'firebase/firestore'
 import { db } from '../../firebase/config'
-import { updateDuplaPago, deleteDupla } from '../../firebase/torneoService'
+import { updateDuplaPago, updateDuplaJugadores, deleteDupla } from '../../firebase/torneoService'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import Spinner from '../ui/Spinner'
 import AppSelect from '../ui/AppSelect'
@@ -40,10 +40,13 @@ function EditRow({ dupla, torneoId, torneoCosto, onSaved }) {
   const isMobile = useIsMobile()
   const fallback = torneoCosto ? String(torneoCosto) : ''
   const [form, setForm] = useState({
+    jugador1: dupla.jugador1 || '',
+    jugador2: dupla.jugador2 || '',
     pago1: { estado: getPago(dupla, 1).estado, metodo: getPago(dupla, 1).metodo || '', monto: getPago(dupla, 1).monto || fallback },
     pago2: { estado: getPago(dupla, 2).estado, metodo: getPago(dupla, 2).metodo || '', monto: getPago(dupla, 2).monto || fallback },
   })
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   function update(num, field, val) {
     const key = `pago${num}`
@@ -51,22 +54,31 @@ function EditRow({ dupla, torneoId, torneoCosto, onSaved }) {
   }
 
   async function handleSave() {
+    if (!form.jugador1.trim() || !form.jugador2.trim()) {
+      setError('Los dos nombres son obligatorios.')
+      return
+    }
+    setError('')
     setSaving(true)
-    await updateDuplaPago(torneoId, dupla.id, form)
+    await Promise.all([
+      updateDuplaPago(torneoId, dupla.id, form),
+      updateDuplaJugadores(torneoId, dupla.id, { jugador1: form.jugador1, jugador2: form.jugador2 }),
+    ])
     setSaving(false)
-    onSaved({ ...dupla, pago1: form.pago1, pago2: form.pago2 })
+    onSaved({ ...dupla, jugador1: form.jugador1.trim(), jugador2: form.jugador2.trim(), pago1: form.pago1, pago2: form.pago2 })
   }
 
   return (
     <div className="da-edit-row">
       {[1, 2].map(num => {
         const pago = form[`pago${num}`]
-        const player = num === 1 ? dupla.jugador1 : dupla.jugador2
+        const nameKey = `jugador${num}`
         return isMobile ? (
           <div key={num} style={{ marginBottom: num === 1 ? 8 : 0 }}>
             <div className="da-edit-player-row">
               <span className="da-edit-j-label" style={{ color: num === 1 ? '#f97316' : '#9999b0' }}>J{num}</span>
-              <span className="da-edit-player-name">{player}</span>
+              <input type="text" value={form[nameKey]} onChange={e => setForm(p => ({ ...p, [nameKey]: e.target.value }))}
+                className="da-inp da-edit-name-input" placeholder={`Jugador ${num}`} />
             </div>
             <div className="da-edit-pago-row-mobile">
               <div style={{ flex: 1 }}>
@@ -85,7 +97,8 @@ function EditRow({ dupla, torneoId, torneoCosto, onSaved }) {
         ) : (
           <div key={num} className="da-edit-pago-row-desktop" style={{ marginBottom: num === 1 ? 6 : 0 }}>
             <span className="da-edit-j-label" style={{ color: num === 1 ? '#f97316' : '#9999b0' }}>J{num}</span>
-            <span className="da-edit-player-name-desktop">{player}</span>
+            <input type="text" value={form[nameKey]} onChange={e => setForm(p => ({ ...p, [nameKey]: e.target.value }))}
+              className="da-inp da-edit-name-input-desktop" placeholder={`Jugador ${num}`} />
             <div style={{ minWidth: 110 }}>
               <AppSelect size="sm" value={pago.estado} onChange={v => update(num, 'estado', v)}
                 options={[{ value: 'pendiente', label: 'Pendiente' }, { value: 'pagado', label: 'Pagado' }]} />
@@ -100,6 +113,7 @@ function EditRow({ dupla, torneoId, torneoCosto, onSaved }) {
           </div>
         )
       })}
+      {error && <p className="da-edit-error">{error}</p>}
       <button onClick={handleSave} disabled={saving} className="da-save-btn">
         {saving ? '...' : 'Guardar'}
       </button>

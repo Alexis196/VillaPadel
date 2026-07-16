@@ -387,6 +387,52 @@ export async function updateDuplaPago(torneoId, duplaId, { pago1, pago2 }) {
   }, { merge: true })
 }
 
+// ─── Update dupla player names ────────────────────────────────────────────────
+// Cascades into zonas/partidos/llaves too: those store their own denormalized
+// copy of jugador1/jugador2 (snapshotted when the fixture/bracket was
+// generated), so fixing a typo here would otherwise leave the stale name
+// showing everywhere else in the app.
+export async function updateDuplaJugadores(torneoId, duplaId, { jugador1, jugador2 }) {
+  const j1 = jugador1.trim()
+  const j2 = jugador2.trim()
+  if (!j1 || !j2) throw new Error('Los dos jugadores son obligatorios.')
+
+  const [zonasSnap, partidosSnap, llavesSnap] = await Promise.all([
+    getDocs(collection(db, 'torneos', torneoId, 'zonas')),
+    getDocs(collection(db, 'torneos', torneoId, 'partidos')),
+    getDocs(collection(db, 'torneos', torneoId, 'llaves')),
+  ])
+
+  const batch = writeBatch(db)
+  batch.set(doc(db, 'torneos', torneoId, 'duplas', duplaId), { jugador1: j1, jugador2: j2 }, { merge: true })
+
+  for (const zonaDoc of zonasSnap.docs) {
+    const duplasArr = zonaDoc.data().duplas || []
+    if (!duplasArr.some(d => d.id === duplaId)) continue
+    batch.update(zonaDoc.ref, {
+      duplas: duplasArr.map(d => d.id === duplaId ? { ...d, jugador1: j1, jugador2: j2 } : d),
+    })
+  }
+
+  for (const partidoDoc of partidosSnap.docs) {
+    const data = partidoDoc.data()
+    const updates = {}
+    if (data.duplaA?.id === duplaId) updates.duplaA = { ...data.duplaA, jugador1: j1, jugador2: j2 }
+    if (data.duplaB?.id === duplaId) updates.duplaB = { ...data.duplaB, jugador1: j1, jugador2: j2 }
+    if (Object.keys(updates).length) batch.update(partidoDoc.ref, updates)
+  }
+
+  for (const llaveDoc of llavesSnap.docs) {
+    const data = llaveDoc.data()
+    const updates = {}
+    if (data.duplaA?.id === duplaId) updates.duplaA = { ...data.duplaA, jugador1: j1, jugador2: j2 }
+    if (data.duplaB?.id === duplaId) updates.duplaB = { ...data.duplaB, jugador1: j1, jugador2: j2 }
+    if (Object.keys(updates).length) batch.update(llaveDoc.ref, updates)
+  }
+
+  await batch.commit()
+}
+
 // ─── Player CRUD (categorization) ────────────────────────────────────────────
 function normalizeLocalidad(str) {
   if (!str) return ''
@@ -452,8 +498,30 @@ const ROUND_NAMES_TABLE = {
   4: ['Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'],
 }
 
-// ─── Generate bracket from zone standings ────────────────────────────────────
-export async function generateBracket(torneoId) {
+// Largest power of two ≤ n (n ≥ 1).
+function previousPowerOfTwo(n) {
+  let p = 1
+  while (p * 2 <= n) p *= 2
+  return p
+}
+
+// Bracket size always rounds DOWN to the nearest power of two: with 9
+// qualifiers the bracket is Cuartos (8) and 1 is left out; with 14
+// qualifiers it's still Cuartos (8) and 6 are left out; with 18 it's Octavos
+// (16) and 2 are left out. However many are left out, they're the
+// lowest-seeded qualifiers — never byes, never rounding up.
+function resolveBracketSize(N) {
+  if (N < 2) return { bracketSize: 0, excluded: 0 }
+  const bracketSize = previousPowerOfTwo(N)
+  return { bracketSize, excluded: N - bracketSize }
+}
+
+// Shared by generateBracket (writes) and previewLlave (read-only): fetches
+// zonas/partidos/torneo and returns every qualifier ranked globally by merit
+// (points → sets won → game difference), across all zones — not "all zone
+// winners, then all runners-up" regardless of how those winners/runners-up
+// actually performed.
+async function getSeededQualifiers(torneoId) {
   const [partidosSnap, zonasSnap, torneoSnap] = await Promise.all([
     getDocs(collection(db, 'torneos', torneoId, 'partidos')),
     getDocs(query(collection(db, 'torneos', torneoId, 'zonas'), orderBy('orden'))),
@@ -465,12 +533,6 @@ export async function generateBracket(torneoId) {
   const zonasArr = zonasSnap.docs.map(d => ({ id: d.id, ...d.data() }))
   const partidosArr = partidosSnap.docs.map(d => ({ id: d.id, ...d.data() }))
 
-  // Seed order: every qualifier ranked globally by merit (points → sets won →
-  // game difference), across all zones — not "all zone winners, then all
-  // runners-up" regardless of how those winners/runners-up actually performed.
-  // This is what decides who gets a bye straight to the next round when the
-  // qualifier count isn't a clean power of two: the best teams overall, not
-  // just whoever happened to finish 1st in their own zone.
   const qualifiers = []
   for (const zona of zonasArr) {
     const zonaPartidos = partidosArr.filter(p => p.zonaId === zona.id)
@@ -484,15 +546,80 @@ export async function generateBracket(torneoId) {
     b.pts - a.pts || b.setsF - a.setsF || b.gamesF - a.gamesF
   )
 
-  const N = seededTeams.length
-  if (N < 2) throw new Error('Se necesitan al menos 2 clasificados para generar la llave.')
+  return seededTeams
+}
 
-  let bracketSize = 2
-  while (bracketSize < N) bracketSize *= 2
-
+function roundNamesFor(bracketSize) {
   const totalRounds = Math.log2(bracketSize)
-  const roundNames = ROUND_NAMES_TABLE[totalRounds] ||
+  return ROUND_NAMES_TABLE[totalRounds] ||
     Array.from({ length: totalRounds }, (_, i) => i === totalRounds - 1 ? 'Final' : `Ronda ${i + 1}`)
+}
+
+// ─── Preview expected qualifiers right after the fixture is generated ────────
+// Deterministic from the zonas already created + clasificadosPorZona — doesn't
+// need any match results. Lets the admin see, right after generating zones,
+// how many duplas will realistically reach the bracket and how many will be
+// left out by the round-down sizing, so they can tweak tamanoZona/
+// clasificadosPorZona and regenerate the fixture before playing a single match.
+export async function previewClasificados(torneoId) {
+  const [zonasSnap, torneoSnap] = await Promise.all([
+    getDocs(collection(db, 'torneos', torneoId, 'zonas')),
+    getDoc(doc(db, 'torneos', torneoId)),
+  ])
+  const torneoData = torneoSnap.data() || {}
+  const clasificadosPorZona = torneoData.clasificadosPorZona || 1
+  const zonasArr = zonasSnap.docs.map(d => d.data())
+
+  const expectedQualifiers = zonasArr.reduce((sum, z) => sum + Math.min(clasificadosPorZona, (z.duplas || []).length), 0)
+  const { bracketSize, excluded } = resolveBracketSize(expectedQualifiers)
+
+  return {
+    numZonas: zonasArr.length,
+    clasificadosPorZona,
+    expectedQualifiers,
+    bracketSize,
+    roundName: bracketSize >= 2 ? roundNamesFor(bracketSize)[0] : null,
+    excluidos: excluded,
+  }
+}
+
+// ─── Preview bracket sizing before generating (read-only) ────────────────────
+// Same resolveBracketSize policy as generateBracket, but computed from the
+// real zone standings without writing anything — shows exactly which
+// qualifiers (by name) would be left out of the bracket.
+export async function previewLlave(torneoId) {
+  const seededTeams = await getSeededQualifiers(torneoId)
+  const N = seededTeams.length
+  const { bracketSize, excluded } = resolveBracketSize(N)
+  if (bracketSize < 2) return { totalQualifiers: N, bracketSize: 0, roundName: null, excluidos: [] }
+
+  return {
+    totalQualifiers: N,
+    bracketSize,
+    roundName: roundNamesFor(bracketSize)[0],
+    excluidos: excluded > 0
+      ? seededTeams.slice(bracketSize).map(t => ({ id: t.id, jugador1: t.jugador1, jugador2: t.jugador2 }))
+      : [],
+  }
+}
+
+// ─── Generate bracket from zone standings ────────────────────────────────────
+// Bracket size always rounds DOWN to the nearest power of two (resolveBracketSize):
+// with 9 qualifiers the bracket is Cuartos (8) and the single lowest-seeded
+// qualifier is left out; with 14 it's still Cuartos (8, 6 left out); with 18
+// it's Octavos (16, 2 left out). Never rounds up, never hands out byes.
+export async function generateBracket(torneoId) {
+  const seededTeams = await getSeededQualifiers(torneoId)
+
+  const N = seededTeams.length
+  const { bracketSize, excluded } = resolveBracketSize(N)
+  if (bracketSize < 2) throw new Error('Se necesitan al menos 2 clasificados para generar la llave.')
+
+  const bracketTeams = seededTeams.slice(0, bracketSize)
+  const excluidos = seededTeams.slice(bracketSize)
+
+  const roundNames = roundNamesFor(bracketSize)
+  const totalRounds = roundNames.length
 
   const batch = writeBatch(db)
   const oldLlaves = await getDocs(collection(db, 'torneos', torneoId, 'llaves'))
@@ -505,28 +632,25 @@ export async function generateBracket(torneoId) {
     roundRefs.push(Array.from({ length: count }, () => doc(collection(db, 'torneos', torneoId, 'llaves'))))
   }
 
+  // bracketTeams has exactly bracketSize entries, so every seed slot below is
+  // filled — no byes to hand out in the first round.
   const firstRoundPairs = getFirstRoundPairs(bracketSize)
-  const byeAdvances = []
 
   for (let i = 0; i < roundRefs[0].length; i++) {
     const [sA, sB] = firstRoundPairs[i]
-    const teamA = sA < N ? { id: seededTeams[sA].id, jugador1: seededTeams[sA].jugador1, jugador2: seededTeams[sA].jugador2, seed: sA + 1 } : null
-    const teamB = sB < N ? { id: seededTeams[sB].id, jugador1: seededTeams[sB].jugador1, jugador2: seededTeams[sB].jugador2, seed: sB + 1 } : null
+    const teamA = { id: bracketTeams[sA].id, jugador1: bracketTeams[sA].jugador1, jugador2: bracketTeams[sA].jugador2, seed: sA + 1 }
+    const teamB = { id: bracketTeams[sB].id, jugador1: bracketTeams[sB].jugador1, jugador2: bracketTeams[sB].jugador2, seed: sB + 1 }
     const nextRef = totalRounds > 1 ? roundRefs[1][Math.floor(i / 2)] : null
     const nextSlot = i % 2 === 0 ? 'A' : 'B'
-    const isBye = !teamA || !teamB
 
     batch.set(roundRefs[0][i], {
       round: 1, roundName: roundNames[0], matchIndex: i,
       duplaA: teamA, duplaB: teamB, resultado: null,
-      estado: isBye ? 'BYE' : 'Programado',
-      ptsA: isBye ? (teamA ? 3 : 0) : null,
-      ptsB: isBye ? (teamB ? 3 : 0) : null,
+      estado: 'Programado',
+      ptsA: null, ptsB: null,
       nextLlaveId: nextRef?.id || null,
       nextSlot: nextRef ? nextSlot : null,
     })
-
-    if (isBye && nextRef) byeAdvances.push({ ref: nextRef, slot: nextSlot, winner: teamA || teamB })
   }
 
   for (let r = 1; r < totalRounds; r++) {
@@ -543,16 +667,13 @@ export async function generateBracket(torneoId) {
     }
   }
 
-  batch.update(doc(db, 'torneos', torneoId), { estado: 'Llave' })
+  batch.update(doc(db, 'torneos', torneoId), {
+    estado: 'Llave',
+    llaveExcluidos: excluidos.map(t => ({ id: t.id, jugador1: t.jugador1, jugador2: t.jugador2 })),
+  })
   await batch.commit()
 
-  if (byeAdvances.length > 0) {
-    const byeBatch = writeBatch(db)
-    for (const { ref, slot, winner } of byeAdvances) {
-      byeBatch.update(ref, { [slot === 'A' ? 'duplaA' : 'duplaB']: winner })
-    }
-    await byeBatch.commit()
-  }
+  return { bracketSize, roundName: roundNames[0], excluidos }
 }
 
 // ─── Delete bracket and revert tournament back to group stage ────────────────
@@ -560,7 +681,7 @@ export async function deleteBracket(torneoId) {
   const llavesSnap = await getDocs(collection(db, 'torneos', torneoId, 'llaves'))
   const batch = writeBatch(db)
   llavesSnap.forEach(d => batch.delete(d.ref))
-  batch.update(doc(db, 'torneos', torneoId), { estado: 'En curso' })
+  batch.update(doc(db, 'torneos', torneoId), { estado: 'En curso', llaveExcluidos: [] })
   await batch.commit()
 }
 

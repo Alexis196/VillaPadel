@@ -5,6 +5,12 @@
 .bv-header { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
 .bv-subtitle { color: #9999b0; font-size: 14px; margin: 0; }
 
+.bv-excluidos-notice {
+  margin: 0 0 20px; padding: 10px 14px; border-radius: 10px;
+  background: rgba(100,100,160,0.1); border: 1px solid #2a2a38;
+  color: #9999b0; font-size: 12.5px; line-height: 1.5;
+}
+
 /* Selector */
 .bv-selector { margin-bottom: 24px; }
 .bv-select-wrap { position: relative; display: inline-flex; align-items: center; }

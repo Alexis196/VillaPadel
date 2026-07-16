@@ -3,7 +3,7 @@ import { collection, getDocs, query, orderBy, where } from 'firebase/firestore'
 import { db } from '../../firebase/config'
 import {
   createTorneo, updateTorneo, deleteTorneo, addDupla, generateFixture, generateBracket, deleteBracket, deleteFixture,
-  updateColaboradores, updateTorneoEstado, getPremioInfo, addGasto, deleteGasto, updateRepartoCampeon,
+  updateColaboradores, updateTorneoEstado, getPremioInfo, addGasto, deleteGasto, updateRepartoCampeon, previewLlave, previewClasificados,
 } from '../../firebase/torneoService'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTorneo } from '../../contexts/TorneoContext'
@@ -188,9 +188,8 @@ function AddDuplasModal({ torneoId, torneoNombre, torneoEstado, torneoTipoTorneo
 
   async function handleSave() {
     const valid = duplas.filter(d => d.jugador1.trim() && d.jugador2.trim())
-    const minRequired = isEnCurso ? 1 : 2
-    if (valid.length < minRequired) {
-      setError(isEnCurso ? 'Completá al menos una dupla.' : 'Se necesitan al menos 2 duplas completas.')
+    if (valid.length < 1) {
+      setError('Completá al menos una dupla.')
       return
     }
     if (isSuma) {
@@ -563,11 +562,21 @@ function NewTorneoModal({ onClose, onCreated }) {
             </div>
             <div>
               <label className="ta-label">Clasifican por zona</label>
-              <div className="ta-toggle-group">
-                {[1, 2].map(n => (
-                  <button key={n} type="button" className={`ta-toggle${form.clasificadosPorZona === n ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, clasificadosPorZona: n }))}>{n === 1 ? '1 pareja' : '2 parejas'}</button>
-                ))}
+              <div className="ta-clasificados-row">
+                <div className="ta-toggle-group">
+                  {[1, 2].map(n => (
+                    <button key={n} type="button" className={`ta-toggle${form.clasificadosPorZona === n ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, clasificadosPorZona: n }))}>{n === 1 ? '1 pareja' : '2 parejas'}</button>
+                  ))}
+                </div>
+                <input
+                  type="number" min="1"
+                  value={form.clasificadosPorZona}
+                  onChange={e => setForm(p => ({ ...p, clasificadosPorZona: Math.max(1, Number(e.target.value) || 1) }))}
+                  className="ta-input ta-clasificados-input"
+                  placeholder="Otro"
+                />
               </div>
+              <p className="ta-suma-note">Para categorías con pocas duplas (ej. 1 sola zona), poné un número más alto para que casi todas lleguen a la llave.</p>
             </div>
           </div>
 
@@ -743,11 +752,21 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
             </div>
             <div>
               <label className="ta-label">Clasifican por zona</label>
-              <div className="ta-toggle-group">
-                {[1, 2].map(n => (
-                  <button key={n} type="button" className={`ta-toggle${form.clasificadosPorZona === n ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, clasificadosPorZona: n }))}>{n === 1 ? '1 pareja' : '2 parejas'}</button>
-                ))}
+              <div className="ta-clasificados-row">
+                <div className="ta-toggle-group">
+                  {[1, 2].map(n => (
+                    <button key={n} type="button" className={`ta-toggle${form.clasificadosPorZona === n ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, clasificadosPorZona: n }))}>{n === 1 ? '1 pareja' : '2 parejas'}</button>
+                  ))}
+                </div>
+                <input
+                  type="number" min="1"
+                  value={form.clasificadosPorZona}
+                  onChange={e => setForm(p => ({ ...p, clasificadosPorZona: Math.max(1, Number(e.target.value) || 1) }))}
+                  className="ta-input ta-clasificados-input"
+                  placeholder="Otro"
+                />
               </div>
+              <p className="ta-suma-note">Para categorías con pocas duplas (ej. 1 sola zona), poné un número más alto para que casi todas lleguen a la llave.</p>
             </div>
           </div>
           {form.modalidadTorneo === 'tradicional' && (
@@ -1034,6 +1053,8 @@ export default function TorneosAdmin() {
   const [generatingFixture, setGeneratingFixture] = useState(false)
   const [llaveConfirm, setLlaveConfirm] = useState(null)
   const [generatingLlave, setGeneratingLlave] = useState(false)
+  const [llavePreview, setLlavePreview] = useState(null)
+  const [loadingLlavePreview, setLoadingLlavePreview] = useState(false)
   const [deleteLlaveConfirm, setDeleteLlaveConfirm] = useState(null)
   const [deletingLlave, setDeletingLlave] = useState(false)
   const [llavesCount, setLlavesCount] = useState(0)
@@ -1041,15 +1062,20 @@ export default function TorneosAdmin() {
   const [deletingFixture, setDeletingFixture] = useState(false)
   const [zonasCount, setZonasCount] = useState(0)
   const [updatingEstado, setUpdatingEstado] = useState(false)
+  const [clasificadosPreview, setClasificadosPreview] = useState(null)
 
   useEffect(() => { if (user) load() }, [user?.uid, isMaster])
 
   useEffect(() => {
-    if (!selected) { setLlavesCount(0); setZonasCount(0); return }
+    if (!selected) { setLlavesCount(0); setZonasCount(0); setClasificadosPreview(null); return }
     getDocs(collection(db, 'torneos', selected.id, 'llaves'))
       .then(snap => setLlavesCount(snap.size))
     getDocs(collection(db, 'torneos', selected.id, 'zonas'))
-      .then(snap => setZonasCount(snap.size))
+      .then(snap => {
+        setZonasCount(snap.size)
+        if (snap.size > 0) previewClasificados(selected.id).then(setClasificadosPreview)
+        else setClasificadosPreview(null)
+      })
   }, [selected?.id])
 
   async function load() {
@@ -1082,9 +1108,28 @@ export default function TorneosAdmin() {
     const zonasSnap = await getDocs(collection(db, 'torneos', torneoId, 'zonas'))
     setZonasCount(zonasSnap.size)
     setLlavesCount(0)
+    setClasificadosPreview(zonasSnap.size > 0 ? await previewClasificados(torneoId) : null)
     setGeneratingFixture(false)
     setFixtureConfirm(null)
     load()
+  }
+
+  async function openLlaveConfirm(t) {
+    setLlaveConfirm(t)
+    setLlavePreview(null)
+    setLoadingLlavePreview(true)
+    try {
+      const preview = await previewLlave(t.id)
+      setLlavePreview(preview)
+    } catch (err) {
+      setLlavePreview({ error: err.message || 'No se pudo calcular la vista previa.' })
+    }
+    setLoadingLlavePreview(false)
+  }
+
+  function closeLlaveConfirm() {
+    setLlaveConfirm(null)
+    setLlavePreview(null)
   }
 
   async function handleGenerateLlave(torneoId) {
@@ -1097,7 +1142,7 @@ export default function TorneosAdmin() {
       alert(err.message || 'Error al generar la llave.')
     }
     setGeneratingLlave(false)
-    setLlaveConfirm(null)
+    closeLlaveConfirm()
     load()
   }
 
@@ -1117,6 +1162,7 @@ export default function TorneosAdmin() {
     setDeleteFixtureConfirm(null)
     setZonasCount(0)
     setLlavesCount(0)
+    setClasificadosPreview(null)
     load()
   }
 
@@ -1227,7 +1273,7 @@ export default function TorneosAdmin() {
                 </button>
                 {zonasCount > 0 && (
                   <button
-                    onClick={() => setLlaveConfirm(t)}
+                    onClick={() => openLlaveConfirm(t)}
                     className="ta-action-card"
                     style={{ border: '1px solid rgba(16,185,129,0.3)' }}
                     onMouseEnter={e => { e.currentTarget.style.background = 'rgba(16,185,129,0.08)'; e.currentTarget.style.borderColor = '#10b981' }}
@@ -1269,6 +1315,15 @@ export default function TorneosAdmin() {
                   </button>
                 )}
               </div>
+
+              {zonasCount > 0 && llavesCount === 0 && clasificadosPreview?.bracketSize > 0 && (
+                <p className="ta-clasificados-preview">
+                  Con la configuración actual: {clasificadosPreview.numZonas} zona{clasificadosPreview.numZonas !== 1 ? 's' : ''} × {clasificadosPreview.clasificadosPorZona} clasifican = {clasificadosPreview.expectedQualifiers} clasificados esperados → llave de <strong>{clasificadosPreview.roundName}</strong> ({clasificadosPreview.bracketSize}).
+                  {clasificadosPreview.excluidos > 0 && (
+                    <> {clasificadosPreview.excluidos === 1 ? '1 pareja quedaría afuera' : `${clasificadosPreview.excluidos} parejas quedarían afuera`} de la llave. Si querés evitarlo, ajustá "Parejas / zona" o "Clasifican" y volvé a generar el fixture.</>
+                  )}
+                </p>
+              )}
 
               <PremiosSection torneo={t} />
 
@@ -1409,10 +1464,28 @@ export default function TorneosAdmin() {
               <span className="ta-confirm-badge-green">{(llaveConfirm.zonas || 1)} zona{(llaveConfirm.zonas || 1) !== 1 ? 's' : ''}</span>
               <span className="ta-confirm-badge-purple">{llaveConfirm.clasificadosPorZona || 1} clasifican / zona</span>
             </div>
+            {loadingLlavePreview ? (
+              <p className="ta-confirm-desc">Calculando clasificados...</p>
+            ) : llavePreview?.error ? (
+              <p className="ta-confirm-error">{llavePreview.error}</p>
+            ) : llavePreview && llavePreview.bracketSize > 0 ? (
+              <>
+                <p className="ta-confirm-desc">
+                  {llavePreview.totalQualifiers} clasificados → llave de {llavePreview.roundName} ({llavePreview.bracketSize} duplas).
+                </p>
+                {llavePreview.excluidos.length > 0 && (
+                  <p className="ta-confirm-warning">
+                    {llavePreview.excluidos.length === 1 ? '1 pareja queda afuera de la llave' : `${llavePreview.excluidos.length} parejas quedan afuera de la llave`} por redondeo (últimas en la tabla general): {llavePreview.excluidos.map(d => `${d.jugador1}/${d.jugador2}`).join(', ')}
+                  </p>
+                )}
+              </>
+            ) : llavePreview ? (
+              <p className="ta-confirm-error">Se necesitan al menos 2 clasificados para generar la llave.</p>
+            ) : null}
             <p className="ta-confirm-desc">Se arma el bracket con los clasificados de la fase de grupos. Si ya existía una llave, será reemplazada.</p>
             <div className="ta-confirm-actions">
-              <button onClick={() => setLlaveConfirm(null)} disabled={generatingLlave} className="ta-btn-secondary">Cancelar</button>
-              <button onClick={() => handleGenerateLlave(llaveConfirm.id)} disabled={generatingLlave} className="ta-btn-green" style={{ cursor: generatingLlave ? 'wait' : 'pointer', opacity: generatingLlave ? 0.7 : 1 }}>
+              <button onClick={closeLlaveConfirm} disabled={generatingLlave} className="ta-btn-secondary">Cancelar</button>
+              <button onClick={() => handleGenerateLlave(llaveConfirm.id)} disabled={generatingLlave || loadingLlavePreview} className="ta-btn-green" style={{ cursor: generatingLlave ? 'wait' : 'pointer', opacity: generatingLlave ? 0.7 : 1 }}>
                 {generatingLlave ? 'Generando...' : '🏅 Generar'}
               </button>
             </div>

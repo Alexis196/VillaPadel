@@ -512,3 +512,8 @@
 }
 .ta-confirm-badges { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }
 .ta-confirm-error { color: #ef4444; font-size: 13px; margin: 0 0 24px; }
+.ta-confirm-warning { color: #f59e0b; font-size: 12.5px; line-height: 1.5; margin: 0 0 16px; padding: 8px 12px; border-radius: 8px; background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); }
+.ta-clasificados-preview { color: #9999b0; font-size: 12.5px; line-height: 1.6; margin: 12px 0 0; padding: 10px 14px; border-radius: 10px; background: rgba(100,100,160,0.08); border: 1px solid #2a2a38; }
+.ta-clasificados-row { display: flex; gap: 8px; align-items: stretch; }
+.ta-clasificados-row .ta-toggle-group { flex: 1; }
+.ta-clasificados-input { width: 64px; flex: none; text-align: center; padding: 8px 6px; }

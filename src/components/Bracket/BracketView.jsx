@@ -239,6 +239,13 @@ export default function BracketView() {
         {rounds.length > 0 && <ShareButton targetRef={shareRef} title="Llave" filename="llave-villapadel" />}
       </div>
 
+      {activeTorneo?.estado === 'Llave' && activeTorneo.llaveExcluidos?.length > 0 && (
+        <div className="bv-excluidos-notice">
+          {activeTorneo.llaveExcluidos.length === 1 ? 'Quedó afuera de la llave por redondeo: ' : `Quedaron afuera de la llave por redondeo (${activeTorneo.llaveExcluidos.length}): `}
+          {activeTorneo.llaveExcluidos.map(d => `${d.jugador1}/${d.jugador2}`).join(', ')}
+        </div>
+      )}
+
       {torneos.length > 1 && (
         <div className="bv-selector">
           <div className="bv-select-wrap">
