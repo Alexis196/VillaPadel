@@ -187,17 +187,18 @@ export default function MatchesView() {
   const isMobile = useIsMobile()
   const shareRef = useRef(null)
   const [activeZona, setActiveZona] = useState('all')
-  const [activeJornada, setActiveJornada] = useState('all')
+  const [activeFecha, setActiveFecha] = useState('all')
   const [playerSearch, setPlayerSearch] = useState('')
 
   useEffect(() => {
     setActiveZona('all')
-    setActiveJornada('all')
+    setActiveFecha('all')
     setPlayerSearch('')
   }, [activeTorneo?.id])
 
-  const jornadas = useMemo(() => [...new Set(partidos.map(p => p.jornada))].sort((a, b) => a - b), [partidos])
-  const isRoundFilter = activeJornada !== 'all' && ROUND_ORDER[activeJornada] != null
+  const fechas = useMemo(() => [...new Set(partidos.map(p => p.fecha).filter(Boolean))].sort(), [partidos])
+  const hasSinFecha = useMemo(() => partidos.some(p => !p.fecha), [partidos])
+  const isRoundFilter = activeFecha !== 'all' && ROUND_ORDER[activeFecha] != null
 
   const filtered = useMemo(() => {
     if (isRoundFilter) return []
@@ -205,24 +206,19 @@ export default function MatchesView() {
     return partidos
       .filter(p => {
         if (activeZona !== 'all' && p.zonaId !== activeZona) return false
-        if (activeJornada !== 'all' && p.jornada !== Number(activeJornada)) return false
+        if (activeFecha === 'sin-fecha' && p.fecha) return false
+        if (activeFecha !== 'all' && activeFecha !== 'sin-fecha' && p.fecha !== activeFecha) return false
         if (q) {
           const names = [p.duplaA?.jugador1, p.duplaA?.jugador2, p.duplaB?.jugador1, p.duplaB?.jugador2]
           if (!names.some(n => n?.toLowerCase().includes(q))) return false
         }
         return true
       })
-      .sort((a, b) => a.jornada - b.jornada || (a.zonaNombre || '').localeCompare(b.zonaNombre || ''))
-  }, [partidos, activeZona, activeJornada, playerSearch, isRoundFilter])
-
-  const jornadaDates = useMemo(() => {
-    const map = {}
-    for (const m of filtered) { if (m.fecha && !map[m.jornada]) map[m.jornada] = m.fecha }
-    return map
-  }, [filtered])
+      .sort((a, b) => (a.fecha || '9999').localeCompare(b.fecha || '9999') || a.jornada - b.jornada || (a.zonaNombre || '').localeCompare(b.zonaNombre || ''))
+  }, [partidos, activeZona, activeFecha, playerSearch, isRoundFilter])
 
   const grouped = useMemo(() => filtered.reduce((acc, m) => {
-    const key = `Jornada ${m.jornada}`
+    const key = m.fecha || 'sin-fecha'
     ;(acc[key] = acc[key] || []).push(m)
     return acc
   }, {}), [filtered])
@@ -238,8 +234,8 @@ export default function MatchesView() {
   }, [allVisibleLlaves])
 
   const visibleLlaves = useMemo(() =>
-    isRoundFilter ? allVisibleLlaves.filter(l => l.roundName === activeJornada) : allVisibleLlaves,
-    [allVisibleLlaves, activeJornada, isRoundFilter]
+    isRoundFilter ? allVisibleLlaves.filter(l => l.roundName === activeFecha) : allVisibleLlaves,
+    [allVisibleLlaves, activeFecha, isRoundFilter]
   )
 
   const groupedLlaves = useMemo(() =>
@@ -297,16 +293,20 @@ export default function MatchesView() {
                 options={[{ value: 'all', label: 'Todas las zonas' }, ...zonas.map(z => ({ value: z.id, label: z.nombre }))]}
               />
             )}
-            {(jornadas.length > 0 || llaveRounds.length > 0) && (
+            {(fechas.length > 0 || llaveRounds.length > 0) && (
               <StyledSelect
-                value={activeJornada}
-                onChange={e => setActiveJornada(e.target.value)}
+                value={activeFecha}
+                onChange={e => setActiveFecha(e.target.value)}
                 groups={[
                   {
-                    label: 'Grupos',
+                    label: 'Fechas',
                     options: [
-                      { value: 'all', label: 'Todas las jornadas' },
-                      ...jornadas.map(j => ({ value: String(j), label: `Jornada ${j}` })),
+                      { value: 'all', label: 'Todas las fechas' },
+                      ...fechas.map(f => ({
+                        value: f,
+                        label: new Date(f + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/^\w/, c => c.toUpperCase()),
+                      })),
+                      ...(hasSinFecha ? [{ value: 'sin-fecha', label: 'Sin fecha' }] : []),
                     ],
                   },
                   ...(llaveRounds.length > 0 ? [{
@@ -360,19 +360,14 @@ export default function MatchesView() {
                 {partidos.length === 0 ? 'No hay partidos para mostrar.' : 'Ningún partido coincide con la búsqueda.'}
               </div>
             ) : (
-              Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([jornada, matches]) => {
-                const jornadaNum = matches[0]?.jornada
-                const fecha = jornadaDates[jornadaNum]
-                const dateLabel = fecha
+              Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([fecha, matches]) => {
+                const dateLabel = fecha !== 'sin-fecha'
                   ? new Date(fecha + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^\w/, c => c.toUpperCase())
-                  : null
+                  : 'Sin fecha asignada'
                 return (
-                  <div key={jornada} className="mv-jornada-section">
+                  <div key={fecha} className="mv-jornada-section">
                     <div className="mv-jornada-header">
-                      <div>
-                        <h2 className="mv-jornada-title">{dateLabel || jornada}</h2>
-                        {dateLabel && <span className="mv-jornada-sub">{jornada}</span>}
-                      </div>
+                      <h2 className="mv-jornada-title">{dateLabel}</h2>
                       <div className="mv-jornada-divider" />
                       <span className="mv-jornada-count">{matches.length} partidos</span>
                     </div>

@@ -78,7 +78,6 @@
 .mv-jornada-section { margin-bottom: 32px; }
 .mv-jornada-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .mv-jornada-title { color: #f1f1f5; font-size: 16px; font-weight: 700; margin: 0; line-height: 1.2; }
-.mv-jornada-sub { color: #6666a0; font-size: 11px; font-weight: 600; }
 .mv-jornada-divider { flex: 1; height: 1px; background: #2a2a38; }
 .mv-jornada-count { color: #9999b0; font-size: 12px; }
 
