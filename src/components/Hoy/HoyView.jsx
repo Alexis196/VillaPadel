@@ -21,12 +21,48 @@ function todayStr() {
   return new Date().toISOString().split('T')[0]
 }
 
-function MatchRow({ match, onClick }) {
+function MatchRow({ match, onClick, isMobile }) {
   const fin = match.estado === 'Finalizado' || match.estado === 'W.O.'
   const live = match.estado === 'En juego'
   const aWon = fin && (match.ptsA || 0) > (match.ptsB || 0)
   const bWon = fin && (match.ptsB || 0) > (match.ptsA || 0)
   const cfg = STATUS_CFG[match.estado] || STATUS_CFG._default
+  const metaText = match.tipo === 'llave' ? match.roundName : `${match.zonaNombre} · J${match.jornada}`
+
+  if (isMobile) {
+    return (
+      <button className="hoy-card-mobile" onClick={onClick}>
+        <div className="hoy-card-mobile-top">
+          <div className="hoy-card-mobile-meta">
+            {match.hora ? <span className="hoy-time-badge">{match.hora}</span> : <span className="hoy-time-tbd">S/H</span>}
+            <span className="hoy-card-mobile-torneo">
+              <span className="hoy-torneo-dot" style={{ background: match.torneoColor || '#f97316' }} />
+              {match.torneoNombre}
+            </span>
+          </div>
+          <span className="hoy-status-badge" style={{ background: cfg.bg, color: cfg.color }}>
+            {live && <span className="hoy-live-dot" />}
+            {match.estado}
+          </span>
+        </div>
+        <div className="hoy-card-mobile-sub">
+          {metaText}{match.cancha && <> · 🎾 {match.cancha}</>}
+        </div>
+        <div className="hoy-card-mobile-pair-row">
+          <span className="hoy-card-mobile-pair" style={{ color: aWon ? '#f1f1f5' : '#9999b0', fontWeight: aWon ? 700 : 500 }}>
+            {match.duplaA?.jugador1} / {match.duplaA?.jugador2}
+          </span>
+          {fin && <span className="hoy-card-mobile-score" style={{ color: aWon ? '#f97316' : '#6a6a80' }}>{match.resultado?.setsA}</span>}
+        </div>
+        <div className="hoy-card-mobile-pair-row">
+          <span className="hoy-card-mobile-pair" style={{ color: bWon ? '#f1f1f5' : '#9999b0', fontWeight: bWon ? 700 : 500 }}>
+            {match.duplaB?.jugador1} / {match.duplaB?.jugador2}
+          </span>
+          {fin && <span className="hoy-card-mobile-score" style={{ color: bWon ? '#f97316' : '#6a6a80' }}>{match.resultado?.setsB}</span>}
+        </div>
+      </button>
+    )
+  }
 
   return (
     <button className="hoy-row" onClick={onClick}>
@@ -39,7 +75,7 @@ function MatchRow({ match, onClick }) {
           <span className="hoy-torneo-dot" style={{ background: match.torneoColor || '#f97316' }} />
           {match.torneoNombre}
           <span className="hoy-row-meta-sep">·</span>
-          {match.tipo === 'llave' ? match.roundName : `${match.zonaNombre} · J${match.jornada}`}
+          {metaText}
           {match.cancha && <><span className="hoy-row-meta-sep">·</span>🎾 {match.cancha}</>}
         </div>
         <div className="hoy-row-players">
@@ -205,7 +241,7 @@ export default function HoyView() {
       ) : (
         <div className="hoy-list">
           {filtered.map(m => (
-            <MatchRow key={`${m.torneoId}-${m.tipo}-${m.id}`} match={m} onClick={() => navigate(`/torneos/${m.torneoId}`)} />
+            <MatchRow key={`${m.torneoId}-${m.tipo}-${m.id}`} match={m} isMobile={isMobile} onClick={() => navigate(`/torneos/${m.torneoId}`)} />
           ))}
         </div>
       )}
