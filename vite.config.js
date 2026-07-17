@@ -31,6 +31,13 @@ export default defineConfig({
         // The background image is ~2.2MB; skip precaching it so the install
         // step doesn't force everyone to download it before the app is usable.
         globIgnores: ['**/background-*.png'],
+        // A new deploy must take over open tabs immediately instead of waiting
+        // for every tab to close — otherwise a tab left open from before a
+        // deploy keeps running the old cached app shell (old JS, missing new
+        // routes/components) until something forces a fresh fetch.
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
       },
     }),
   ],

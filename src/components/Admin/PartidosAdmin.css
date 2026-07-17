@@ -87,6 +87,21 @@
   align-items: center;
 }
 .pa-filter-label { color: #6666a0; font-size: 11px; font-weight: 600; }
+
+/* Player name search */
+.pa-search-wrap { position: relative; flex: 1 1 180px; min-width: 150px; max-width: 260px; }
+.pa-search-icon { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #6666a0; font-size: 13px; pointer-events: none; }
+.pa-search-input {
+  width: 100%; background: #13131a; border: 1px solid #2a2a38; border-radius: 8px;
+  padding: 7px 30px 7px 30px; color: #f1f1f5; font-size: 13px; outline: none;
+  box-sizing: border-box; transition: border-color 0.15s;
+}
+.pa-search-input:focus { border-color: #f97316; }
+.pa-search-clear {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  background: transparent; border: none; color: #9999b0; cursor: pointer; font-size: 14px; line-height: 1;
+}
+
 .pa-page-size-group { margin-left: auto; display: flex; gap: 4px; align-items: center; }
 .pa-page-size-label { color: #6666a0; font-size: 12px; }
 .pa-pagesize-btn {

@@ -899,6 +899,7 @@ export default function PartidosAdmin() {
   const [filterZona, setFilterZona] = useState('all')
   const [filterJornada, setFilterJornada] = useState('all')
   const [filterEstado, setFilterEstado] = useState('all')
+  const [filterSearch, setFilterSearch] = useState('')
   const [openIds, setOpenIds] = useState([])
   const [pageSize, setPageSize] = useState(10)
   const [page, setPage] = useState(1)
@@ -919,7 +920,7 @@ export default function PartidosAdmin() {
     if (!activeTorneoId) return
     setOpenIds([])
     setLoading(true)
-    setFilterZona('all'); setFilterJornada('all'); setFilterEstado('all')
+    setFilterZona('all'); setFilterJornada('all'); setFilterEstado('all'); setFilterSearch('')
     setPage(1)
     // A pending "generate bracket?" prompt belongs to whichever tournament was
     // active when it fired — it must not follow the admin to a different tab.
@@ -1039,15 +1040,28 @@ export default function PartidosAdmin() {
 
   const jornadas = useMemo(() => [...new Set(partidos.map(p => p.jornada))].sort((a, b) => a - b), [partidos])
 
-  const filtered = useMemo(() => partidos
-    .filter(p =>
-      (filterZona === 'all' || p.zonaId === filterZona) &&
-      (filterJornada === 'all' || p.jornada === Number(filterJornada)) &&
-      (filterEstado === 'all' || p.estado === filterEstado)
-    )
-    .sort((a, b) => a.jornada - b.jornada || (a.zonaNombre || '').localeCompare(b.zonaNombre || '')),
-    [partidos, filterZona, filterJornada, filterEstado]
-  )
+  const filtered = useMemo(() => {
+    const q = filterSearch.trim().toLowerCase()
+    return partidos
+      .filter(p => {
+        if (filterZona !== 'all' && p.zonaId !== filterZona) return false
+        if (filterJornada !== 'all' && p.jornada !== Number(filterJornada)) return false
+        if (filterEstado !== 'all' && p.estado !== filterEstado) return false
+        if (q) {
+          const names = [p.duplaA?.jugador1, p.duplaA?.jugador2, p.duplaB?.jugador1, p.duplaB?.jugador2]
+          if (!names.some(n => n?.toLowerCase().includes(q))) return false
+        }
+        return true
+      })
+      // Chronological schedule order (fecha, then hora) first, jornada/zona as tiebreak
+      // for matches that share (or lack) a scheduled time.
+      .sort((a, b) =>
+        (a.fecha || '9999-99-99').localeCompare(b.fecha || '9999-99-99') ||
+        (a.hora || '99:99').localeCompare(b.hora || '99:99') ||
+        a.jornada - b.jornada ||
+        (a.zonaNombre || '').localeCompare(b.zonaNombre || '')
+      )
+  }, [partidos, filterZona, filterJornada, filterEstado, filterSearch])
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -1170,6 +1184,19 @@ export default function PartidosAdmin() {
                   ]}
                   minWidth={150}
                 />
+                <div className="pa-search-wrap">
+                  <span className="pa-search-icon">🔍</span>
+                  <input
+                    type="text"
+                    placeholder="Buscar jugador..."
+                    value={filterSearch}
+                    onChange={e => { setFilterSearch(e.target.value); setPage(1) }}
+                    className="pa-search-input"
+                  />
+                  {filterSearch && (
+                    <button onClick={() => { setFilterSearch(''); setPage(1) }} className="pa-search-clear">×</button>
+                  )}
+                </div>
                 <div className="pa-page-size-group">
                   <span className="pa-page-size-label">Ver</span>
                   {[10, 25, 50].map(n => (

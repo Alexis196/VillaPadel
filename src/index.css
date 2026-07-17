@@ -32,6 +32,13 @@
 ═══════════════════════════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; }
 
+/* Keyboard-only focus ring — visible for tab navigation, silent for mouse clicks */
+:focus-visible {
+  outline: 2px solid rgba(255,122,0,.65);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 body {
   background-color: #0b1020;
   color: var(--text-main);
@@ -157,22 +164,27 @@ body {
   color: var(--orange-main);
 }
 
-.nav-btn-login {
-  padding: 7px 16px;
+/* Deliberately muted and low-priority: this is a staff-only entry point, not
+   the site's main action, so it must not compete visually with real nav items. */
+.nav-staff-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.07);
   background: transparent;
-  color: rgba(255,255,255,.5);
-  font-size: 13px;
+  color: rgba(255,255,255,.32);
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   font-family: var(--font-body);
   transition: all .2s ease;
 }
-.nav-btn-login:hover {
-  border-color: var(--orange-main);
-  color: var(--orange-main);
-  background: rgba(255,122,0,.05);
+.nav-staff-btn:hover {
+  border-color: rgba(255,255,255,.18);
+  color: rgba(255,255,255,.6);
+  background: rgba(255,255,255,.04);
 }
 
 /* Drawer */
@@ -519,46 +531,6 @@ body {
   transform: translateY(-4px);
   border-color: var(--border-orange);
   box-shadow: 0 22px 44px rgba(255,140,0,.1), 0 8px 20px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.06);
-}
-
-/* Feature Cards */
-.feature-card {
-  background: rgba(17,24,39,.55);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,.055);
-  border-radius: 16px;
-  padding: 24px 18px;
-  text-align: center;
-  transition: all .25s cubic-bezier(.22,.61,.36,1);
-}
-.feature-card:hover {
-  background: rgba(17,24,39,.82);
-  border-color: rgba(255,140,0,.22);
-  transform: translateY(-3px);
-  box-shadow: 0 14px 32px rgba(0,0,0,.22), 0 0 0 1px rgba(255,140,0,.06);
-}
-
-.feature-icon {
-  color: var(--orange-main);
-  margin-bottom: 12px;
-  display: flex;
-  justify-content: center;
-  filter: drop-shadow(0 0 8px rgba(255,122,0,.3));
-}
-
-.feature-title {
-  color: var(--text-main);
-  font-size: 13.5px;
-  font-weight: 700;
-  margin-bottom: 6px;
-  letter-spacing: -.01em;
-}
-
-.feature-desc {
-  color: rgba(255,255,255,.38);
-  font-size: 12px;
-  line-height: 1.55;
 }
 
 /* ═══════════════════════════════════════════════════

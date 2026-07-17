@@ -149,6 +149,22 @@ export default function LandingView() {
             Seguí los torneos, resultados y tabla de posiciones de VillaPadel Club.
           </p>
 
+          <div className="hero-access-pill animate-fadein-delay-2">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="4" y="10" width="16" height="10" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0" />
+            </svg>
+            Acceso libre — no necesitás cuenta
+          </div>
+
+          <div className="hero-cta-row animate-fadein-delay-3">
+            <button className="btn-primary" onClick={() => navigate('/hoy')} style={{ padding: isMobile ? '13px 30px' : undefined }}>
+              📅 Partidos de hoy
+            </button>
+            <button className="btn-ghost" onClick={() => navigate('/torneos')} style={{ padding: isMobile ? '13px 26px' : '14px 30px', fontSize: 14 }}>
+              Ver torneos
+            </button>
+          </div>
+
           <div className="hero-stats animate-fadein-delay-3" style={{ gap: isMobile ? 20 : undefined, padding: isMobile ? '15px 22px' : undefined }}>
             <StatItem value={torneos.length} label="Torneos" />
             <div className="stat-divider" />
@@ -163,49 +179,16 @@ export default function LandingView() {
       <div className="lv-body" style={{ padding: isMobile ? '28px 14px 64px' : '44px 24px 72px' }}>
 
         <div className="lv-features-section">
-          <p className="lv-features-label">Explorá la plataforma</p>
-          <h2 style={{ fontSize: isMobile ? 18 : 22, fontWeight: 800, color: '#fff', margin: '0 0 20px', letterSpacing: '-0.3px' }}>
-            Todo lo que encontrás en VillaPadel
-          </h2>
+          <p className="lv-features-label">Qué vas a encontrar dentro de cada torneo</p>
 
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(3, 1fr)', gap: isMobile ? 10 : 14 }}>
+          <div className="lv-features-strip">
             {FEATURES.map((f, i) => (
-              <div
-                key={f.title}
-                className="feature-card animate-fadein"
-                style={{
-                  animationDelay: `${i * 0.06}s`,
-                  padding: isMobile ? '18px 12px' : undefined,
-                  border: '1px solid rgba(255,255,255,0.03)',
-                  boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
-                  transition: 'all 0.25s ease',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.transform = 'translateY(-3px)'
-                  e.currentTarget.style.borderColor = 'rgba(249,115,22,0.3)'
-                  e.currentTarget.style.boxShadow = '0 10px 30px rgba(0,0,0,0.4), 0 0 20px rgba(249,115,22,0.05)'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.03)'
-                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.2)'
-                }}
-              >
-                <div className="feature-icon">{f.icon(isMobile ? 24 : 28)}</div>
-                <div className="feature-title">{f.title}</div>
-                <div className="feature-desc">{f.desc}</div>
+              <div key={f.title} className="lv-feature-chip animate-fadein" style={{ animationDelay: `${i * 0.05}s` }}>
+                <span className="lv-feature-chip-icon">{f.icon(15)}</span>
+                {f.title}
               </div>
             ))}
           </div>
-        </div>
-
-        <div className="lv-cta lv-cta-buttons">
-          <button className="btn-primary" onClick={() => navigate('/torneos')} style={{ padding: isMobile ? '13px 36px' : undefined }}>
-            Ver torneos
-          </button>
-          <button className="btn-ghost" onClick={() => navigate('/categorizacion')} style={{ padding: isMobile ? '13px 28px' : '14px 32px', fontSize: 14 }}>
-            Ver categorización
-          </button>
         </div>
 
         {proximosTorneos.length > 0 && (

@@ -5,6 +5,7 @@ import InstallPrompt from './components/InstallPrompt'
 import LandingView from './components/Landing/LandingView'
 import TorneosListView from './components/Torneos/TorneosListView'
 import TorneoDetailView from './components/Torneos/TorneoDetailView'
+import HoyView from './components/Hoy/HoyView'
 import PlayersView from './components/Players/PlayersView'
 import CampeonesView from './components/Campeones/CampeonesView'
 import LoginView from './components/Auth/LoginView'
@@ -45,6 +46,7 @@ export default function App() {
               <main>
                 <Routes>
                   <Route path="/" element={<LandingView />} />
+                  <Route path="/hoy" element={<HoyView />} />
                   <Route path="/torneos" element={<TorneosListView />} />
                   <Route path="/torneos/:id" element={<TorneoDetailView />} />
                   <Route path="/categorizacion" element={<PlayersView />} />

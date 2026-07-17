@@ -8,6 +8,7 @@ import './Navbar.css'
 
 const navItems = [
   { to: '/',               label: 'Inicio',         icon: '🏠', end: true },
+  { to: '/hoy',            label: 'Hoy',             icon: '📅', end: false },
   { to: '/torneos',        label: 'Torneos',         icon: '🏆', end: false },
   { to: '/categorizacion', label: 'Categorización',  icon: '👤', end: false },
   { to: '/campeones',      label: 'Campeones',       icon: '🥇', end: false },
@@ -127,7 +128,12 @@ export default function Navbar() {
             {user ? (
               <UserMenu user={user} isAdmin={isAdmin} />
             ) : (
-              <button className="nav-btn-login" onClick={() => navigate('/login')}>Iniciar sesión</button>
+              <button className="nav-staff-btn" onClick={() => navigate('/login')} title="Acceso exclusivo para colaboradores del torneo">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" />
+                </svg>
+                Staff
+              </button>
             )}
           </div>
         </div>

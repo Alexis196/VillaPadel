@@ -3,11 +3,30 @@
 /* Body container */
 .lv-body { max-width: 960px; margin: 0 auto; }
 
-/* Features section */
+/* Hero: free-access reassurance + primary CTAs (Nielsen — match system status,
+   Fitts's Law — put the real action above the fold, next to the pitch) */
+.hero-access-pill {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: rgba(34,197,94,.09); border: 1px solid rgba(34,197,94,.28);
+  color: #4ade80; font-size: 12.5px; font-weight: 600;
+  padding: 6px 15px; border-radius: 20px; margin-bottom: 22px;
+}
+.hero-cta-row { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 30px; }
+
+/* Features section — informational only, not clickable: each icon maps to a
+   per-tournament tab, so there's no single destination to link to from here.
+   Flat pill styling (no elevation/hover-lift) reads as a label, not a button. */
 .lv-features-section { margin-bottom: 36px; }
-.lv-features-label { color: #f97316; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 8px; }
-.lv-cta { text-align: center; margin-bottom: 48px; }
-.lv-cta-buttons { display: flex; align-items: center; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.lv-features-label { color: #f97316; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 12px; }
+.lv-features-strip { display: flex; flex-wrap: wrap; gap: 9px; }
+.lv-feature-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 15px; border-radius: 20px;
+  background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
+  color: rgba(255,255,255,.5); font-size: 12.5px; font-weight: 600;
+  cursor: default; user-select: none;
+}
+.lv-feature-chip-icon { display: flex; color: rgba(255,255,255,.32); }
 
 /* Próximamente row */
 .lv-proximo-row {
