@@ -75,7 +75,7 @@ function roundRobinSchedule(count) {
 }
 
 // ─── Create tournament ────────────────────────────────────────────────────────
-export async function createTorneo({ nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, fechaFin, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona, tercerSetDesde, ownerUid, ownerEmail }) {
+export async function createTorneo({ nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, fechaFin, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona, cantidadClasificados, tercerSetDesde, ownerUid, ownerEmail }) {
   const today = todayStr()
   const estado = fechaInicio > today ? 'Inscripción' : 'En curso'
   const ref = await addDoc(collection(db, 'torneos'), {
@@ -93,6 +93,7 @@ export async function createTorneo({ nombre, categoriaId, categoriaName, categor
     color: color || null,
     tamanoZona: Number(tamanoZona) || 4,
     clasificadosPorZona: Number(clasificadosPorZona) || 1,
+    cantidadClasificados: Number(cantidadClasificados) || 0,
     tercerSetDesde: tercerSetDesde || 'semifinal',
     repartoCampeonPct: 70,
     ownerUid: ownerUid || null,
@@ -161,7 +162,7 @@ export async function getPremioInfo(torneoId) {
 // Inscripción — once it has moved on (En curso/Llave/Finalizado), a routine edit
 // (fixing the name, tweaking the cost, setting tercerSetDesde) must not silently
 // regress it back.
-export async function updateTorneo(id, { nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, fechaFin, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona, tercerSetDesde }) {
+export async function updateTorneo(id, { nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, fechaFin, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona, cantidadClasificados, tercerSetDesde }) {
   const currentSnap = await getDoc(doc(db, 'torneos', id))
   const currentEstado = currentSnap.data()?.estado
   const data = {
@@ -175,6 +176,7 @@ export async function updateTorneo(id, { nombre, categoriaId, categoriaName, cat
     color: color || null,
     tamanoZona: Number(tamanoZona) || 4,
     clasificadosPorZona: Number(clasificadosPorZona) || 1,
+    cantidadClasificados: Number(cantidadClasificados) || 0,
     tercerSetDesde: tercerSetDesde || 'semifinal',
   }
   if (!currentEstado || currentEstado === 'Inscripción') {
@@ -499,22 +501,137 @@ const ROUND_NAMES_TABLE = {
   4: ['Octavos de Final', 'Cuartos de Final', 'Semifinal', 'Final'],
 }
 
-// Largest power of two ≤ n (n ≥ 1).
-function previousPowerOfTwo(n) {
+// Smallest power of two ≥ n (n ≥ 1).
+function nextPowerOfTwo(n) {
   let p = 1
-  while (p * 2 <= n) p *= 2
+  while (p < n) p *= 2
   return p
 }
 
-// Bracket size always rounds DOWN to the nearest power of two: with 9
-// qualifiers the bracket is Cuartos (8) and 1 is left out; with 14
-// qualifiers it's still Cuartos (8) and 6 are left out; with 18 it's Octavos
-// (16) and 2 are left out. However many are left out, they're the
-// lowest-seeded qualifiers — never byes, never rounding up.
+// Bracket size always rounds UP to the nearest power of two: with 12
+// qualifiers (as configured via clasificadosPorZona) the bracket is Octavos
+// (16) and the top 4 seeds get a first-round bye; with 9 qualifiers it's
+// still Octavos (16, 7 byes); with 8 it's Cuartos (8, no byes). Every
+// configured qualifier always reaches the bracket — nobody gets excluded by
+// rounding, byes fill the gap instead.
 export function resolveBracketSize(N) {
-  if (N < 2) return { bracketSize: 0, excluded: 0 }
-  const bracketSize = previousPowerOfTwo(N)
-  return { bracketSize, excluded: N - bracketSize }
+  if (N < 2) return { bracketSize: 0, byes: 0 }
+  const bracketSize = nextPowerOfTwo(N)
+  return { bracketSize, byes: bracketSize - N }
+}
+
+// Which seeds (1-indexed, within the real 1..N qualifiers) get a first-round
+// bye for a given bracketSize/N combo. Standard seeding (seedOrder) pairs
+// seed 1 with the worst remaining seed, so the seeds left unpaired (because
+// their opponent's seed number is > N, i.e. doesn't exist) are always the
+// best of the qualifiers that don't have a "real" first-round opponent.
+function computeFirstRoundByes(bracketSize, N) {
+  const byeSeeds = []
+  for (const [aIdx, bIdx] of getFirstRoundPairs(bracketSize)) {
+    const sA = aIdx + 1, sB = bIdx + 1
+    if (sA <= N && sB > N) byeSeeds.push(sA)
+    else if (sB <= N && sA > N) byeSeeds.push(sB)
+  }
+  return byeSeeds.sort((x, y) => x - y)
+}
+
+// Standard seeding (seed 1 vs seed bracketSize, 2 vs bracketSize-1, etc.) is
+// purely by merit — it doesn't know two adjacent seeds came from the same
+// zona, so two teams that already played each other in the group stage can
+// get paired again immediately in round 1. Since they already faced off,
+// swap seed assignments to break up same-zona round-1 pairs, always
+// preferring the closest-ranked alternative so the overall seeding order is
+// disturbed as little as possible. Byes are untouched (they're decided by
+// seed number vs N, not by who occupies the seed).
+export function assignBracketSeeds(seededTeams, bracketSize) {
+  const N = seededTeams.length
+  const bySeed = new Map(seededTeams.map((t, i) => [i + 1, t]))
+  const realPairs = getFirstRoundPairs(bracketSize)
+    .map(([aIdx, bIdx]) => [aIdx + 1, bIdx + 1])
+    .filter(([sA, sB]) => sA <= N && sB <= N)
+
+  const zonaOf = seed => bySeed.get(seed)?.zonaId
+  const clashes = ([sA, sB]) => zonaOf(sA) != null && zonaOf(sA) === zonaOf(sB)
+
+  for (let pass = 0; pass < 4; pass++) {
+    let resolvedAny = false
+    for (const pair of realPairs) {
+      if (!clashes(pair)) continue
+      const [sA, sB] = pair
+      let bestCandidate = null
+      let bestDist = Infinity
+      for (const [oA, oB] of realPairs) {
+        if (oA === sA && oB === sB) continue
+        for (const cand of [oA, oB]) {
+          if (zonaOf(sA) === zonaOf(cand)) continue
+          const candPartner = cand === oA ? oB : oA
+          if (zonaOf(candPartner) === zonaOf(sB)) continue
+          const dist = Math.abs(cand - sB)
+          if (dist < bestDist) { bestDist = dist; bestCandidate = cand }
+        }
+      }
+      if (bestCandidate != null) {
+        const tmp = bySeed.get(sB)
+        bySeed.set(sB, bySeed.get(bestCandidate))
+        bySeed.set(bestCandidate, tmp)
+        resolvedAny = true
+      }
+    }
+    if (!resolvedAny) break
+  }
+
+  return Array.from({ length: N }, (_, i) => bySeed.get(i + 1))
+}
+
+// Shared by getSeededQualifiers (server, real results) and the admin's live
+// "quién pasaría ahora" preview (client, onSnapshot data) — same policy, one
+// place, so they can't drift apart.
+//
+// Two qualification modes:
+//   - Per zone (default, cantidadClasificados not set): the top
+//     clasificadosPorZona of EACH zone qualify, regardless of how they'd
+//     compare to another zone's teams.
+//   - Total del torneo (cantidadClasificados > 0): every team from every zone
+//     is thrown into one pool ranked by merit, and the top N overall qualify
+//     — a strong zone can send more than a weak one, or a weak zone none at
+//     all.
+// Tiebreak by NET difference (sets won − sets lost, then games won − games
+// lost), not by raw totals won — a team that needed a 3rd set to win 2-1
+// racks up more total games than one that won 2-0, but that's not better
+// form, so ranking by the raw total would rank them above a cleaner 2-0.
+function sortByMerit(a, b) {
+  return b.pts - a.pts || (b.setsF - b.setsC) - (a.setsF - a.setsC) || (b.gamesF - b.gamesC) - (a.gamesF - a.gamesC)
+}
+
+// Every team from every zone, ranked in one pool by merit (points → sets won
+// → games won) instead of "top of each zone" — the full ranking behind
+// "Total del torneo" mode, each row tagged with its own zona so a global
+// table can still show where everyone came from.
+export function computeGlobalStandings(zonasArr, partidosArr) {
+  const all = []
+  for (const zona of zonasArr) {
+    const zonaPartidos = partidosArr.filter(p => p.zonaId === zona.id)
+    for (const row of computeStandings(zonaPartidos, zona.duplas || [])) {
+      all.push({ ...row, zonaId: zona.id, zonaNombre: zona.nombre })
+    }
+  }
+  return all.sort(sortByMerit)
+}
+
+export function computeQualifiers(zonasArr, partidosArr, { clasificadosPorZona = 1, cantidadClasificados = 0 } = {}) {
+  if (cantidadClasificados > 0) {
+    return computeGlobalStandings(zonasArr, partidosArr).slice(0, cantidadClasificados)
+  }
+
+  const qualifiers = []
+  for (const zona of zonasArr) {
+    const zonaPartidos = partidosArr.filter(p => p.zonaId === zona.id)
+    const standings = computeStandings(zonaPartidos, zona.duplas || [])
+    for (let k = 0; k < clasificadosPorZona; k++) {
+      if (standings[k]) qualifiers.push({ ...standings[k], zonaId: zona.id, zonaNombre: zona.nombre })
+    }
+  }
+  return [...qualifiers].sort(sortByMerit)
 }
 
 // Shared by generateBracket (writes) and previewLlave (read-only): fetches
@@ -530,24 +647,13 @@ async function getSeededQualifiers(torneoId) {
   ])
 
   const torneoData = torneoSnap.data() || {}
-  const clasificadosPorZona = torneoData.clasificadosPorZona || 1
   const zonasArr = zonasSnap.docs.map(d => ({ id: d.id, ...d.data() }))
   const partidosArr = partidosSnap.docs.map(d => ({ id: d.id, ...d.data() }))
 
-  const qualifiers = []
-  for (const zona of zonasArr) {
-    const zonaPartidos = partidosArr.filter(p => p.zonaId === zona.id)
-    const standings = computeStandings(zonaPartidos, zona.duplas || [])
-    for (let k = 0; k < clasificadosPorZona; k++) {
-      if (standings[k]) qualifiers.push(standings[k])
-    }
-  }
-
-  const seededTeams = [...qualifiers].sort((a, b) =>
-    b.pts - a.pts || b.setsF - a.setsF || b.gamesF - a.gamesF
-  )
-
-  return seededTeams
+  return computeQualifiers(zonasArr, partidosArr, {
+    clasificadosPorZona: torneoData.clasificadosPorZona || 1,
+    cantidadClasificados: torneoData.cantidadClasificados || 0,
+  })
 }
 
 export function roundNamesFor(bracketSize) {
@@ -559,8 +665,8 @@ export function roundNamesFor(bracketSize) {
 // ─── Preview expected qualifiers right after the fixture is generated ────────
 // Deterministic from the zonas already created + clasificadosPorZona — doesn't
 // need any match results. Lets the admin see, right after generating zones,
-// how many duplas will realistically reach the bracket and how many will be
-// left out by the round-down sizing, so they can tweak tamanoZona/
+// how many duplas will realistically reach the bracket and how many will get
+// a first-round bye from the round-up sizing, so they can tweak tamanoZona/
 // clasificadosPorZona and regenerate the fixture before playing a single match.
 export async function previewClasificados(torneoId) {
   const [zonasSnap, torneoSnap] = await Promise.all([
@@ -569,55 +675,63 @@ export async function previewClasificados(torneoId) {
   ])
   const torneoData = torneoSnap.data() || {}
   const clasificadosPorZona = torneoData.clasificadosPorZona || 1
+  const cantidadClasificados = torneoData.cantidadClasificados || 0
   const zonasArr = zonasSnap.docs.map(d => d.data())
 
-  const expectedQualifiers = zonasArr.reduce((sum, z) => sum + Math.min(clasificadosPorZona, (z.duplas || []).length), 0)
-  const { bracketSize, excluded } = resolveBracketSize(expectedQualifiers)
+  const totalDuplas = zonasArr.reduce((sum, z) => sum + (z.duplas || []).length, 0)
+  const expectedQualifiers = cantidadClasificados > 0
+    ? Math.min(cantidadClasificados, totalDuplas)
+    : zonasArr.reduce((sum, z) => sum + Math.min(clasificadosPorZona, (z.duplas || []).length), 0)
+  const { bracketSize, byes } = resolveBracketSize(expectedQualifiers)
 
   return {
     numZonas: zonasArr.length,
     clasificadosPorZona,
+    cantidadClasificados,
     expectedQualifiers,
     bracketSize,
     roundName: bracketSize >= 2 ? roundNamesFor(bracketSize)[0] : null,
-    excluidos: excluded,
+    byes,
   }
 }
 
 // ─── Preview bracket sizing before generating (read-only) ────────────────────
 // Same resolveBracketSize policy as generateBracket, but computed from the
 // real zone standings without writing anything — shows exactly which
-// qualifiers (by name) would be left out of the bracket.
+// qualifiers (by name) would get a first-round bye.
 export async function previewLlave(torneoId) {
-  const seededTeams = await getSeededQualifiers(torneoId)
-  const N = seededTeams.length
-  const { bracketSize, excluded } = resolveBracketSize(N)
-  if (bracketSize < 2) return { totalQualifiers: N, bracketSize: 0, roundName: null, excluidos: [] }
+  const seededTeamsRaw = await getSeededQualifiers(torneoId)
+  const N = seededTeamsRaw.length
+  const { bracketSize, byes } = resolveBracketSize(N)
+  if (bracketSize < 2) return { totalQualifiers: N, bracketSize: 0, roundName: null, byes: 0, byeTeams: [] }
 
+  const seededTeams = assignBracketSeeds(seededTeamsRaw, bracketSize)
+  const byeSeeds = byes > 0 ? computeFirstRoundByes(bracketSize, N) : []
   return {
     totalQualifiers: N,
     bracketSize,
     roundName: roundNamesFor(bracketSize)[0],
-    excluidos: excluded > 0
-      ? seededTeams.slice(bracketSize).map(t => ({ id: t.id, jugador1: t.jugador1, jugador2: t.jugador2 }))
-      : [],
+    byes,
+    byeTeams: byeSeeds.map(s => ({ id: seededTeams[s - 1].id, jugador1: seededTeams[s - 1].jugador1, jugador2: seededTeams[s - 1].jugador2, seed: s })),
   }
 }
 
 // ─── Generate bracket from zone standings ────────────────────────────────────
-// Bracket size always rounds DOWN to the nearest power of two (resolveBracketSize):
-// with 9 qualifiers the bracket is Cuartos (8) and the single lowest-seeded
-// qualifier is left out; with 14 it's still Cuartos (8, 6 left out); with 18
-// it's Octavos (16, 2 left out). Never rounds up, never hands out byes.
+// Bracket size always rounds UP to the nearest power of two (resolveBracketSize)
+// so every configured qualifier reaches the bracket: with 12 qualifiers the
+// bracket is Octavos (16) and the top 4 seeds get a first-round bye instead of
+// a real match. A bye "match" is recorded with estado 'BYE' and its team is
+// advanced straight into round 2 at generation time (no admin action needed).
 export async function generateBracket(torneoId) {
-  const seededTeams = await getSeededQualifiers(torneoId)
+  const seededTeamsRaw = await getSeededQualifiers(torneoId)
 
-  const N = seededTeams.length
-  const { bracketSize, excluded } = resolveBracketSize(N)
+  const N = seededTeamsRaw.length
+  const { bracketSize, byes } = resolveBracketSize(N)
   if (bracketSize < 2) throw new Error('Se necesitan al menos 2 clasificados para generar la llave.')
 
-  const bracketTeams = seededTeams.slice(0, bracketSize)
-  const excluidos = seededTeams.slice(bracketSize)
+  // Reassign seed slots so no round-1 match repeats a group-stage matchup
+  // (same zona), before pairing seeds into matches below.
+  const seededTeams = assignBracketSeeds(seededTeamsRaw, bracketSize)
 
   const roundNames = roundNamesFor(bracketSize)
   const totalRounds = roundNames.length
@@ -633,34 +747,53 @@ export async function generateBracket(torneoId) {
     roundRefs.push(Array.from({ length: count }, () => doc(collection(db, 'torneos', torneoId, 'llaves'))))
   }
 
-  // bracketTeams has exactly bracketSize entries, so every seed slot below is
-  // filled — no byes to hand out in the first round.
+  // Seeds 1..N are real qualifiers; seeds N+1..bracketSize don't exist — those
+  // slots are byes, and standard seeding (getFirstRoundPairs) always pairs
+  // them against the best remaining real seeds.
   const firstRoundPairs = getFirstRoundPairs(bracketSize)
+  const toDupla = (seed) => (seed <= N ? { id: seededTeams[seed - 1].id, jugador1: seededTeams[seed - 1].jugador1, jugador2: seededTeams[seed - 1].jugador2, seed } : null)
+
+  // advancedWinners[i]: the team that already won round-1 match i via a bye,
+  // so round 2 can be pre-filled with it instead of waiting on a real match.
+  const advancedWinners = []
 
   for (let i = 0; i < roundRefs[0].length; i++) {
-    const [sA, sB] = firstRoundPairs[i]
-    const teamA = { id: bracketTeams[sA].id, jugador1: bracketTeams[sA].jugador1, jugador2: bracketTeams[sA].jugador2, seed: sA + 1 }
-    const teamB = { id: bracketTeams[sB].id, jugador1: bracketTeams[sB].jugador1, jugador2: bracketTeams[sB].jugador2, seed: sB + 1 }
+    const [sAIdx, sBIdx] = firstRoundPairs[i]
+    const duplaA = toDupla(sAIdx + 1)
+    const duplaB = toDupla(sBIdx + 1)
+    const isBye = !duplaA || !duplaB
     const nextRef = totalRounds > 1 ? roundRefs[1][Math.floor(i / 2)] : null
     const nextSlot = i % 2 === 0 ? 'A' : 'B'
 
     batch.set(roundRefs[0][i], {
       round: 1, roundName: roundNames[0], matchIndex: i,
-      duplaA: teamA, duplaB: teamB, resultado: null,
-      estado: 'Programado',
+      duplaA, duplaB, resultado: null,
+      estado: isBye ? 'BYE' : 'Programado',
       ptsA: null, ptsB: null,
       nextLlaveId: nextRef?.id || null,
       nextSlot: nextRef ? nextSlot : null,
     })
+
+    advancedWinners[i] = isBye ? (duplaA || duplaB) : null
   }
 
   for (let r = 1; r < totalRounds; r++) {
     for (let i = 0; i < roundRefs[r].length; i++) {
       const nextRef = r + 1 < totalRounds ? roundRefs[r + 1][Math.floor(i / 2)] : null
       const nextSlot = i % 2 === 0 ? 'A' : 'B'
+
+      // Only round 2 (r === 1) can have byes feeding into it — byes only ever
+      // come from round 1, so nothing beyond round 2 needs pre-filling.
+      let duplaA = null, duplaB = null, estado = 'Pendiente'
+      if (r === 1) {
+        duplaA = advancedWinners[i * 2] || null
+        duplaB = advancedWinners[i * 2 + 1] || null
+        if (duplaA && duplaB) estado = 'Programado'
+      }
+
       batch.set(roundRefs[r][i], {
         round: r + 1, roundName: roundNames[r], matchIndex: i,
-        duplaA: null, duplaB: null, resultado: null, estado: 'Pendiente',
+        duplaA, duplaB, resultado: null, estado,
         ptsA: null, ptsB: null,
         nextLlaveId: nextRef?.id || null,
         nextSlot: nextRef ? nextSlot : null,
@@ -670,11 +803,11 @@ export async function generateBracket(torneoId) {
 
   batch.update(doc(db, 'torneos', torneoId), {
     estado: 'Llave',
-    llaveExcluidos: excluidos.map(t => ({ id: t.id, jugador1: t.jugador1, jugador2: t.jugador2 })),
+    llaveExcluidos: [],
   })
   await batch.commit()
 
-  return { bracketSize, roundName: roundNames[0], excluidos }
+  return { bracketSize, roundName: roundNames[0], byes }
 }
 
 // ─── Delete bracket and revert tournament back to group stage ────────────────
@@ -766,7 +899,7 @@ export function computeStandings(partidos, duplas) {
     const h2hWinner = headToHead[`${a.id}_${b.id}`]
     if (h2hWinner === a.id) return -1
     if (h2hWinner === b.id) return 1
-    return b.setsF - a.setsF || b.gamesF - a.gamesF
+    return (b.setsF - b.setsC) - (a.setsF - a.setsC) || (b.gamesF - b.gamesC) - (a.gamesF - a.gamesC)
   })
 }
 

@@ -4,7 +4,7 @@ import { db } from '../../firebase/config'
 import {
   createTorneo, updateTorneo, deleteTorneo, addDupla, generateFixture, generateBracket, deleteBracket, deleteFixture,
   updateColaboradores, updateTorneoEstado, getPremioInfo, addGasto, deleteGasto, updateRepartoCampeon, previewLlave, previewClasificados,
-  computeStandings, resolveBracketSize, roundNamesFor,
+  computeQualifiers, resolveBracketSize, roundNamesFor,
 } from '../../firebase/torneoService'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTorneo } from '../../contexts/TorneoContext'
@@ -404,7 +404,7 @@ function NewTorneoModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
     nombre: '', tipoTorneo: 'categoria', modalidadTorneo: 'tradicional', categoriaId: 'cat-8va',
     sumaValor: '', fechaInicio: '', fechaFin: '', costoPorJugador: '', sexo: 'masculino',
-    tamanoZona: 4, clasificadosPorZona: 1, tercerSetDesde: 'semifinal',
+    tamanoZona: 4, modoClasificacion: 'zona', clasificadosPorZona: 1, cantidadClasificados: '', tercerSetDesde: 'semifinal',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -415,6 +415,9 @@ function NewTorneoModal({ onClose, onCreated }) {
     if (!form.fechaInicio) { setError('La fecha de inicio es obligatoria.'); return }
     if (form.tipoTorneo === 'suma' && (!form.sumaValor || Number(form.sumaValor) < 1)) {
       setError('Ingresá el valor de suma (ej: 15).'); return
+    }
+    if (form.modoClasificacion === 'total' && (!form.cantidadClasificados || Number(form.cantidadClasificados) < 2)) {
+      setError('Ingresá cuántas parejas clasifican en total (mínimo 2).'); return
     }
     setError('')
     setSaving(true)
@@ -449,6 +452,7 @@ function NewTorneoModal({ onClose, onCreated }) {
       sexo: form.sexo,
       tamanoZona: form.tamanoZona,
       clasificadosPorZona: form.clasificadosPorZona,
+      cantidadClasificados: form.modoClasificacion === 'total' ? Number(form.cantidadClasificados) : 0,
       tercerSetDesde: form.tercerSetDesde,
       ownerUid: user?.uid || null,
       ownerEmail: user?.email || null,
@@ -563,22 +567,41 @@ function NewTorneoModal({ onClose, onCreated }) {
               </div>
             </div>
             <div>
-              <label className="ta-label">Clasifican por zona</label>
-              <div className="ta-clasificados-row">
-                <div className="ta-toggle-group">
-                  {[1, 2].map(n => (
-                    <button key={n} type="button" className={`ta-toggle${form.clasificadosPorZona === n ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, clasificadosPorZona: n }))}>{n === 1 ? '1 pareja' : '2 parejas'}</button>
-                  ))}
-                </div>
-                <input
-                  type="number" min="1"
-                  value={form.clasificadosPorZona}
-                  onChange={e => setForm(p => ({ ...p, clasificadosPorZona: Math.max(1, Number(e.target.value) || 1) }))}
-                  className="ta-input ta-clasificados-input"
-                  placeholder="Otro"
-                />
+              <label className="ta-label">Clasifican</label>
+              <div className="ta-toggle-group" style={{ marginBottom: 8 }}>
+                <button type="button" className={`ta-toggle${form.modoClasificacion === 'zona' ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, modoClasificacion: 'zona' }))}>Por zona</button>
+                <button type="button" className={`ta-toggle${form.modoClasificacion === 'total' ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, modoClasificacion: 'total' }))}>Total del torneo</button>
               </div>
-              <p className="ta-suma-note">Para categorías con pocas duplas (ej. 1 sola zona), poné un número más alto para que casi todas lleguen a la llave.</p>
+              {form.modoClasificacion === 'zona' ? (
+                <>
+                  <div className="ta-clasificados-row">
+                    <div className="ta-toggle-group">
+                      {[1, 2].map(n => (
+                        <button key={n} type="button" className={`ta-toggle${form.clasificadosPorZona === n ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, clasificadosPorZona: n }))}>{n === 1 ? '1 pareja' : '2 parejas'}</button>
+                      ))}
+                    </div>
+                    <input
+                      type="number" min="1"
+                      value={form.clasificadosPorZona}
+                      onChange={e => setForm(p => ({ ...p, clasificadosPorZona: Math.max(1, Number(e.target.value) || 1) }))}
+                      className="ta-input ta-clasificados-input"
+                      placeholder="Otro"
+                    />
+                  </div>
+                  <p className="ta-suma-note">Para categorías con pocas duplas (ej. 1 sola zona), poné un número más alto para que casi todas lleguen a la llave.</p>
+                </>
+              ) : (
+                <>
+                  <input
+                    type="number" min="2"
+                    value={form.cantidadClasificados}
+                    onChange={e => setForm(p => ({ ...p, cantidadClasificados: e.target.value }))}
+                    className="ta-input"
+                    placeholder="ej. 12"
+                  />
+                  <p className="ta-suma-note">Pasan las {form.cantidadClasificados || 'N'} mejores parejas de todo el torneo, sin importar la zona (por puntos, luego sets, luego games).</p>
+                </>
+              )}
             </div>
           </div>
 
@@ -634,7 +657,9 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
     costoPorJugador: torneo.costoPorJugador ? String(torneo.costoPorJugador) : '',
     sexo: torneo.sexo || 'masculino',
     tamanoZona: torneo.tamanoZona || 4,
+    modoClasificacion: torneo.cantidadClasificados > 0 ? 'total' : 'zona',
     clasificadosPorZona: torneo.clasificadosPorZona || 1,
+    cantidadClasificados: torneo.cantidadClasificados ? String(torneo.cantidadClasificados) : '',
     tercerSetDesde: torneo.tercerSetDesde || 'semifinal',
   })
   const [saving, setSaving] = useState(false)
@@ -646,6 +671,9 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
     if (!form.fechaInicio) { setError('La fecha de inicio es obligatoria.'); return }
     if (form.tipoTorneo === 'suma' && (!form.sumaValor || Number(form.sumaValor) < 1)) {
       setError('Ingresá el valor de suma.'); return
+    }
+    if (form.modoClasificacion === 'total' && (!form.cantidadClasificados || Number(form.cantidadClasificados) < 2)) {
+      setError('Ingresá cuántas parejas clasifican en total (mínimo 2).'); return
     }
     setError('')
     setSaving(true)
@@ -668,6 +696,7 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
       color, sexo: form.sexo,
       tamanoZona: form.tamanoZona,
       clasificadosPorZona: form.clasificadosPorZona,
+      cantidadClasificados: form.modoClasificacion === 'total' ? Number(form.cantidadClasificados) : 0,
       tercerSetDesde: form.tercerSetDesde,
     })
     setSaving(false)
@@ -753,22 +782,41 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
               </div>
             </div>
             <div>
-              <label className="ta-label">Clasifican por zona</label>
-              <div className="ta-clasificados-row">
-                <div className="ta-toggle-group">
-                  {[1, 2].map(n => (
-                    <button key={n} type="button" className={`ta-toggle${form.clasificadosPorZona === n ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, clasificadosPorZona: n }))}>{n === 1 ? '1 pareja' : '2 parejas'}</button>
-                  ))}
-                </div>
-                <input
-                  type="number" min="1"
-                  value={form.clasificadosPorZona}
-                  onChange={e => setForm(p => ({ ...p, clasificadosPorZona: Math.max(1, Number(e.target.value) || 1) }))}
-                  className="ta-input ta-clasificados-input"
-                  placeholder="Otro"
-                />
+              <label className="ta-label">Clasifican</label>
+              <div className="ta-toggle-group" style={{ marginBottom: 8 }}>
+                <button type="button" className={`ta-toggle${form.modoClasificacion === 'zona' ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, modoClasificacion: 'zona' }))}>Por zona</button>
+                <button type="button" className={`ta-toggle${form.modoClasificacion === 'total' ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, modoClasificacion: 'total' }))}>Total del torneo</button>
               </div>
-              <p className="ta-suma-note">Para categorías con pocas duplas (ej. 1 sola zona), poné un número más alto para que casi todas lleguen a la llave.</p>
+              {form.modoClasificacion === 'zona' ? (
+                <>
+                  <div className="ta-clasificados-row">
+                    <div className="ta-toggle-group">
+                      {[1, 2].map(n => (
+                        <button key={n} type="button" className={`ta-toggle${form.clasificadosPorZona === n ? ' active' : ''}`} onClick={() => setForm(p => ({ ...p, clasificadosPorZona: n }))}>{n === 1 ? '1 pareja' : '2 parejas'}</button>
+                      ))}
+                    </div>
+                    <input
+                      type="number" min="1"
+                      value={form.clasificadosPorZona}
+                      onChange={e => setForm(p => ({ ...p, clasificadosPorZona: Math.max(1, Number(e.target.value) || 1) }))}
+                      className="ta-input ta-clasificados-input"
+                      placeholder="Otro"
+                    />
+                  </div>
+                  <p className="ta-suma-note">Para categorías con pocas duplas (ej. 1 sola zona), poné un número más alto para que casi todas lleguen a la llave.</p>
+                </>
+              ) : (
+                <>
+                  <input
+                    type="number" min="2"
+                    value={form.cantidadClasificados}
+                    onChange={e => setForm(p => ({ ...p, cantidadClasificados: e.target.value }))}
+                    className="ta-input"
+                    placeholder="ej. 12"
+                  />
+                  <p className="ta-suma-note">Pasan las {form.cantidadClasificados || 'N'} mejores parejas de todo el torneo, sin importar la zona (por puntos, luego sets, luego games).</p>
+                </>
+              )}
             </div>
           </div>
           {form.modalidadTorneo === 'tradicional' && (
@@ -1089,7 +1137,10 @@ export default function TorneosAdmin() {
   useEffect(() => {
     if (!selected || zonasCount === 0 || llavesCount > 0) { setLiveQualifiers(null); return }
     const torneoId = selected.id
-    const clasificadosPorZona = selected.clasificadosPorZona || 1
+    const config = {
+      clasificadosPorZona: selected.clasificadosPorZona || 1,
+      cantidadClasificados: selected.cantidadClasificados || 0,
+    }
     let zonasData = []
     let partidosData = []
 
@@ -1097,24 +1148,16 @@ export default function TorneosAdmin() {
       const anyPlayed = partidosData.some(p => p.resultado)
       if (!anyPlayed) { setLiveQualifiers(null); return }
 
-      const qualifiers = []
-      for (const zona of zonasData) {
-        const zonaPartidos = partidosData.filter(p => p.zonaId === zona.id)
-        const standings = computeStandings(zonaPartidos, zona.duplas || [])
-        for (let k = 0; k < clasificadosPorZona; k++) {
-          if (standings[k]) qualifiers.push(standings[k])
-        }
-      }
-      const seeded = [...qualifiers].sort((a, b) => b.pts - a.pts || b.setsF - a.setsF || b.gamesF - a.gamesF)
+      const seeded = computeQualifiers(zonasData, partidosData, config)
       const N = seeded.length
-      const { bracketSize, excluded } = resolveBracketSize(N)
+      const { bracketSize, byes } = resolveBracketSize(N)
       setLiveQualifiers({
         total: N,
         bracketSize,
-        excluded,
+        byes,
         roundName: bracketSize >= 2 ? roundNamesFor(bracketSize)[0] : null,
-        calificados: bracketSize >= 2 ? seeded.slice(0, bracketSize) : [],
-        excluidos: bracketSize >= 2 ? seeded.slice(bracketSize) : [],
+        calificados: bracketSize >= 2 ? seeded : [],
+        conBye: bracketSize >= 2 && byes > 0 ? seeded.slice(0, byes) : [],
       })
     }
 
@@ -1128,7 +1171,7 @@ export default function TorneosAdmin() {
     })
 
     return () => { unsubZonas(); unsubPartidos() }
-  }, [selected?.id, selected?.clasificadosPorZona, zonasCount, llavesCount])
+  }, [selected?.id, selected?.clasificadosPorZona, selected?.cantidadClasificados, zonasCount, llavesCount])
 
   async function load() {
     setLoading(true)
@@ -1289,7 +1332,9 @@ export default function TorneosAdmin() {
                 {[
                   { label: 'Zonas', value: t.zonas ?? '—' },
                   { label: 'Parejas / zona', value: t.tamanoZona || 4 },
-                  { label: 'Clasifican', value: t.clasificadosPorZona || 1 },
+                  t.cantidadClasificados > 0
+                    ? { label: 'Clasifican (total)', value: t.cantidadClasificados }
+                    : { label: 'Clasifican / zona', value: t.clasificadosPorZona || 1 },
                   { label: 'Costo / jugador', value: t.costoPorJugador ? `$${Number(t.costoPorJugador).toLocaleString()}` : '—' },
                 ].map(s => (
                   <div key={s.label} className="ta-stat-card">
@@ -1370,9 +1415,13 @@ export default function TorneosAdmin() {
 
               {zonasCount > 0 && llavesCount === 0 && clasificadosPreview?.bracketSize > 0 && (
                 <p className="ta-clasificados-preview">
-                  Con la configuración actual: {clasificadosPreview.numZonas} zona{clasificadosPreview.numZonas !== 1 ? 's' : ''} × {clasificadosPreview.clasificadosPorZona} clasifican = {clasificadosPreview.expectedQualifiers} clasificados esperados → llave de <strong>{clasificadosPreview.roundName}</strong> ({clasificadosPreview.bracketSize}).
-                  {clasificadosPreview.excluidos > 0 && (
-                    <> {clasificadosPreview.excluidos === 1 ? '1 pareja quedaría afuera' : `${clasificadosPreview.excluidos} parejas quedarían afuera`} de la llave. Si querés evitarlo, ajustá "Parejas / zona" o "Clasifican" y volvé a generar el fixture.</>
+                  {clasificadosPreview.cantidadClasificados > 0 ? (
+                    <>Con la configuración actual: {clasificadosPreview.cantidadClasificados} clasificados en total → llave de <strong>{clasificadosPreview.roundName}</strong> ({clasificadosPreview.bracketSize}).</>
+                  ) : (
+                    <>Con la configuración actual: {clasificadosPreview.numZonas} zona{clasificadosPreview.numZonas !== 1 ? 's' : ''} × {clasificadosPreview.clasificadosPorZona} clasifican = {clasificadosPreview.expectedQualifiers} clasificados esperados → llave de <strong>{clasificadosPreview.roundName}</strong> ({clasificadosPreview.bracketSize}).</>
+                  )}
+                  {clasificadosPreview.byes > 0 && (
+                    <> {clasificadosPreview.byes === 1 ? '1 pareja tendría bye' : `${clasificadosPreview.byes} parejas tendrían bye`} en primera ronda (todos los clasificados entran a la llave).</>
                   )}
                 </p>
               )}
@@ -1384,16 +1433,17 @@ export default function TorneosAdmin() {
                     En vivo — así quedaría la llave si se cerrara ahora
                   </div>
                   <p className="ta-live-preview-text">
-                    {liveQualifiers.total} clasificado{liveQualifiers.total !== 1 ? 's' : ''} con los resultados cargados hasta el momento → llave de <strong>{liveQualifiers.roundName}</strong> ({liveQualifiers.bracketSize}).
+                    {liveQualifiers.total} clasificado{liveQualifiers.total !== 1 ? 's' : ''} con los resultados cargados hasta el momento → llave de <strong>{liveQualifiers.roundName}</strong> ({liveQualifiers.bracketSize}). Todos entran a la llave.
                   </p>
                   <div className="ta-live-preview-list">
                     {liveQualifiers.calificados.map((q, i) => (
                       <span key={q.id} className="ta-live-chip">#{i + 1} {q.jugador1} / {q.jugador2}</span>
                     ))}
                   </div>
-                  {liveQualifiers.excluidos.length > 0 && (
-                    <p className="ta-live-preview-excluidos">
-                      Por ahora quedarían afuera: {liveQualifiers.excluidos.map(q => `${q.jugador1} / ${q.jugador2}`).join(', ')}.
+                  {liveQualifiers.conBye.length > 0 && (
+                    <p className="ta-live-preview-bye">
+                      {liveQualifiers.conBye.length === 1 ? 'Tendría bye en primera ronda: ' : `Tendrían bye en primera ronda (${liveQualifiers.conBye.length}): `}
+                      {liveQualifiers.conBye.map(q => `${q.jugador1} / ${q.jugador2}`).join(', ')}.
                     </p>
                   )}
                   <p className="ta-live-preview-note">Esto es solo una proyección — no genera nada. Cuando termine la fase de grupos, generá la llave con el botón de arriba.</p>
@@ -1517,7 +1567,9 @@ export default function TorneosAdmin() {
             <p className="ta-confirm-name"><strong style={{ color: '#f1f1f5' }}>{fixtureConfirm.nombre}</strong></p>
             <div className="ta-confirm-badges">
               <span className="ta-confirm-badge-orange">{fixtureConfirm.tamanoZona || 4} parejas / zona</span>
-              <span className="ta-confirm-badge-purple">{fixtureConfirm.clasificadosPorZona || 1} clasifican</span>
+              <span className="ta-confirm-badge-purple">
+                {fixtureConfirm.cantidadClasificados > 0 ? `${fixtureConfirm.cantidadClasificados} clasifican (total)` : `${fixtureConfirm.clasificadosPorZona || 1} clasifican / zona`}
+              </span>
             </div>
             <p className="ta-confirm-desc">Se generarán las zonas y cruces automáticamente. Si ya existía un fixture, será reemplazado.</p>
             <div className="ta-confirm-actions">
@@ -1537,7 +1589,9 @@ export default function TorneosAdmin() {
             <p className="ta-confirm-name"><strong style={{ color: '#f1f1f5' }}>{llaveConfirm.nombre}</strong></p>
             <div className="ta-confirm-badges">
               <span className="ta-confirm-badge-green">{(llaveConfirm.zonas || 1)} zona{(llaveConfirm.zonas || 1) !== 1 ? 's' : ''}</span>
-              <span className="ta-confirm-badge-purple">{llaveConfirm.clasificadosPorZona || 1} clasifican / zona</span>
+              <span className="ta-confirm-badge-purple">
+                {llaveConfirm.cantidadClasificados > 0 ? `${llaveConfirm.cantidadClasificados} clasifican (total)` : `${llaveConfirm.clasificadosPorZona || 1} clasifican / zona`}
+              </span>
             </div>
             {loadingLlavePreview ? (
               <p className="ta-confirm-desc">Calculando clasificados...</p>
@@ -1546,11 +1600,11 @@ export default function TorneosAdmin() {
             ) : llavePreview && llavePreview.bracketSize > 0 ? (
               <>
                 <p className="ta-confirm-desc">
-                  {llavePreview.totalQualifiers} clasificados → llave de {llavePreview.roundName} ({llavePreview.bracketSize} duplas).
+                  {llavePreview.totalQualifiers} clasificados → llave de {llavePreview.roundName} ({llavePreview.bracketSize} duplas). Todos entran a la llave.
                 </p>
-                {llavePreview.excluidos.length > 0 && (
+                {llavePreview.byeTeams.length > 0 && (
                   <p className="ta-confirm-warning">
-                    {llavePreview.excluidos.length === 1 ? '1 pareja queda afuera de la llave' : `${llavePreview.excluidos.length} parejas quedan afuera de la llave`} por redondeo (últimas en la tabla general): {llavePreview.excluidos.map(d => `${d.jugador1}/${d.jugador2}`).join(', ')}
+                    {llavePreview.byeTeams.length === 1 ? '1 pareja tiene bye' : `${llavePreview.byeTeams.length} parejas tienen bye`} en primera ronda (mejor ubicadas en la tabla general): {llavePreview.byeTeams.map(d => `${d.jugador1}/${d.jugador2}`).join(', ')}
                   </p>
                 )}
               </>

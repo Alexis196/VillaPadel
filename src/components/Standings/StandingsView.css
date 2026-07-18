@@ -4,6 +4,16 @@
 .sv-selectors { display: flex; gap: 10px; margin-bottom: 22px; flex-wrap: wrap; align-items: center; }
 .sv-empty { text-align: center; background: rgba(17,24,39,.5); backdrop-filter: blur(10px); border-radius: 20px; border: 1px solid rgba(255,255,255,.06); color: rgba(255,255,255,.45); }
 
+/* Zona / Tabla general toggle */
+.sv-mode-toggle { display: inline-flex; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 3px; gap: 2px; }
+.sv-mode-btn { background: transparent; border: none; color: rgba(255,255,255,.5); font-size: 12.5px; font-weight: 600; padding: 7px 14px; border-radius: 7px; cursor: pointer; transition: all .15s; }
+.sv-mode-btn.active { background: var(--orange-main); color: #1a1208; }
+
+/* Cutoff line between qualifying and eliminated rows in "Tabla general" */
+.sv-cutoff-line { display: flex; align-items: center; gap: 10px; margin: 10px 0; color: #f97316; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.sv-cutoff-line::before, .sv-cutoff-line::after { content: ''; flex: 1; height: 1px; background: rgba(249,115,22,.3); }
+.sv-mobile-zona { color: rgba(255,255,255,.35); font-size: 11px; margin-top: 2px; }
+
 /* Mobile cards */
 .sv-mobile-list { display: flex; flex-direction: column; gap: 10px; }
 .sv-mobile-card-body { padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
