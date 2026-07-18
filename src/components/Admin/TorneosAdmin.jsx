@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore'
+import { collection, getDocs, onSnapshot, query, orderBy, where } from 'firebase/firestore'
 import { db } from '../../firebase/config'
 import {
   createTorneo, updateTorneo, deleteTorneo, addDupla, generateFixture, generateBracket, deleteBracket, deleteFixture,
   updateColaboradores, updateTorneoEstado, getPremioInfo, addGasto, deleteGasto, updateRepartoCampeon, previewLlave, previewClasificados,
+  computeStandings, resolveBracketSize, roundNamesFor,
 } from '../../firebase/torneoService'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTorneo } from '../../contexts/TorneoContext'
 import Spinner from '../ui/Spinner'
 import AppSelect from '../ui/AppSelect'
 import { useIsMobile } from '../../hooks/useIsMobile'
+import { todayStr } from '../../utils/date'
 import './TorneosAdmin.css'
 
 const CAT_OPTIONS = [
@@ -417,7 +419,7 @@ function NewTorneoModal({ onClose, onCreated }) {
     setError('')
     setSaving(true)
 
-    const today = new Date().toISOString().split('T')[0]
+    const today = todayStr()
     const estado = form.fechaInicio > today ? 'Inscripción' : 'En curso'
 
     let categoriaId, categoriaName, categoriaValor, color
@@ -600,7 +602,7 @@ function NewTorneoModal({ onClose, onCreated }) {
             <span className="ta-preview-text" style={{ color: previewColor }}>{previewName}</span>
             {form.fechaInicio && (
               <span className="ta-preview-date">
-                {form.fechaInicio > new Date().toISOString().split('T')[0] ? '📋 Inscripción' : '▶️ En curso'}
+                {form.fechaInicio > todayStr() ? '📋 Inscripción' : '▶️ En curso'}
               </span>
             )}
           </div>
@@ -788,7 +790,7 @@ function EditTorneoModal({ torneo, onClose, onSaved }) {
             <span className="ta-preview-text" style={{ color: previewColor }}>{previewName}</span>
             {form.fechaInicio && (
               <span className="ta-preview-date">
-                {form.fechaInicio > new Date().toISOString().split('T')[0] ? '📋 Inscripción' : '▶️ En curso'}
+                {form.fechaInicio > todayStr() ? '📋 Inscripción' : '▶️ En curso'}
               </span>
             )}
           </div>
@@ -1063,6 +1065,7 @@ export default function TorneosAdmin() {
   const [zonasCount, setZonasCount] = useState(0)
   const [updatingEstado, setUpdatingEstado] = useState(false)
   const [clasificadosPreview, setClasificadosPreview] = useState(null)
+  const [liveQualifiers, setLiveQualifiers] = useState(null)
 
   useEffect(() => { if (user) load() }, [user?.uid, isMaster])
 
@@ -1077,6 +1080,55 @@ export default function TorneosAdmin() {
         else setClasificadosPreview(null)
       })
   }, [selected?.id])
+
+  // Live "quién pasaría ahora" preview: recomputes qualifiers/bracket sizing
+  // straight from onSnapshot data as zone results come in, without writing
+  // anything — the real bracket is still only created when the admin presses
+  // "Generar llave" (avoids clobbering an in-progress bracket by regenerating
+  // it automatically on every loaded result).
+  useEffect(() => {
+    if (!selected || zonasCount === 0 || llavesCount > 0) { setLiveQualifiers(null); return }
+    const torneoId = selected.id
+    const clasificadosPorZona = selected.clasificadosPorZona || 1
+    let zonasData = []
+    let partidosData = []
+
+    const recompute = () => {
+      const anyPlayed = partidosData.some(p => p.resultado)
+      if (!anyPlayed) { setLiveQualifiers(null); return }
+
+      const qualifiers = []
+      for (const zona of zonasData) {
+        const zonaPartidos = partidosData.filter(p => p.zonaId === zona.id)
+        const standings = computeStandings(zonaPartidos, zona.duplas || [])
+        for (let k = 0; k < clasificadosPorZona; k++) {
+          if (standings[k]) qualifiers.push(standings[k])
+        }
+      }
+      const seeded = [...qualifiers].sort((a, b) => b.pts - a.pts || b.setsF - a.setsF || b.gamesF - a.gamesF)
+      const N = seeded.length
+      const { bracketSize, excluded } = resolveBracketSize(N)
+      setLiveQualifiers({
+        total: N,
+        bracketSize,
+        excluded,
+        roundName: bracketSize >= 2 ? roundNamesFor(bracketSize)[0] : null,
+        calificados: bracketSize >= 2 ? seeded.slice(0, bracketSize) : [],
+        excluidos: bracketSize >= 2 ? seeded.slice(bracketSize) : [],
+      })
+    }
+
+    const unsubZonas = onSnapshot(query(collection(db, 'torneos', torneoId, 'zonas'), orderBy('orden')), snap => {
+      zonasData = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      recompute()
+    })
+    const unsubPartidos = onSnapshot(collection(db, 'torneos', torneoId, 'partidos'), snap => {
+      partidosData = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      recompute()
+    })
+
+    return () => { unsubZonas(); unsubPartidos() }
+  }, [selected?.id, selected?.clasificadosPorZona, zonasCount, llavesCount])
 
   async function load() {
     setLoading(true)
@@ -1323,6 +1375,29 @@ export default function TorneosAdmin() {
                     <> {clasificadosPreview.excluidos === 1 ? '1 pareja quedaría afuera' : `${clasificadosPreview.excluidos} parejas quedarían afuera`} de la llave. Si querés evitarlo, ajustá "Parejas / zona" o "Clasifican" y volvé a generar el fixture.</>
                   )}
                 </p>
+              )}
+
+              {liveQualifiers && liveQualifiers.bracketSize > 0 && (
+                <div className="ta-live-preview">
+                  <div className="ta-live-preview-head">
+                    <span className="ta-live-dot" />
+                    En vivo — así quedaría la llave si se cerrara ahora
+                  </div>
+                  <p className="ta-live-preview-text">
+                    {liveQualifiers.total} clasificado{liveQualifiers.total !== 1 ? 's' : ''} con los resultados cargados hasta el momento → llave de <strong>{liveQualifiers.roundName}</strong> ({liveQualifiers.bracketSize}).
+                  </p>
+                  <div className="ta-live-preview-list">
+                    {liveQualifiers.calificados.map((q, i) => (
+                      <span key={q.id} className="ta-live-chip">#{i + 1} {q.jugador1} / {q.jugador2}</span>
+                    ))}
+                  </div>
+                  {liveQualifiers.excluidos.length > 0 && (
+                    <p className="ta-live-preview-excluidos">
+                      Por ahora quedarían afuera: {liveQualifiers.excluidos.map(q => `${q.jugador1} / ${q.jugador2}`).join(', ')}.
+                    </p>
+                  )}
+                  <p className="ta-live-preview-note">Esto es solo una proyección — no genera nada. Cuando termine la fase de grupos, generá la llave con el botón de arriba.</p>
+                </div>
               )}
 
               <PremiosSection torneo={t} />

@@ -4,6 +4,7 @@ import {
   writeBatch, serverTimestamp, query, orderBy, where, arrayUnion, arrayRemove,
 } from 'firebase/firestore'
 import { sendPasswordResetEmail } from 'firebase/auth'
+import { todayStr } from '../utils/date'
 
 // ─── American tournament set winner ──────────────────────────────────────────
 // First to 9 games; if tied at 8-8, win by 2
@@ -75,7 +76,7 @@ function roundRobinSchedule(count) {
 
 // ─── Create tournament ────────────────────────────────────────────────────────
 export async function createTorneo({ nombre, categoriaId, categoriaName, categoriaValor, costoPorJugador, fechaInicio, fechaFin, tipoTorneo, modalidadTorneo, color, sexo, tamanoZona, clasificadosPorZona, tercerSetDesde, ownerUid, ownerEmail }) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = todayStr()
   const estado = fechaInicio > today ? 'Inscripción' : 'En curso'
   const ref = await addDoc(collection(db, 'torneos'), {
     nombre,
@@ -177,7 +178,7 @@ export async function updateTorneo(id, { nombre, categoriaId, categoriaName, cat
     tercerSetDesde: tercerSetDesde || 'semifinal',
   }
   if (!currentEstado || currentEstado === 'Inscripción') {
-    const today = new Date().toISOString().split('T')[0]
+    const today = todayStr()
     data.estado = fechaInicio > today ? 'Inscripción' : 'En curso'
   }
   await setDoc(doc(db, 'torneos', id), data, { merge: true })
@@ -510,7 +511,7 @@ function previousPowerOfTwo(n) {
 // qualifiers it's still Cuartos (8) and 6 are left out; with 18 it's Octavos
 // (16) and 2 are left out. However many are left out, they're the
 // lowest-seeded qualifiers — never byes, never rounding up.
-function resolveBracketSize(N) {
+export function resolveBracketSize(N) {
   if (N < 2) return { bracketSize: 0, excluded: 0 }
   const bracketSize = previousPowerOfTwo(N)
   return { bracketSize, excluded: N - bracketSize }
@@ -549,7 +550,7 @@ async function getSeededQualifiers(torneoId) {
   return seededTeams
 }
 
-function roundNamesFor(bracketSize) {
+export function roundNamesFor(bracketSize) {
   const totalRounds = Math.log2(bracketSize)
   return ROUND_NAMES_TABLE[totalRounds] ||
     Array.from({ length: totalRounds }, (_, i) => i === totalRounds - 1 ? 'Final' : `Ronda ${i + 1}`)

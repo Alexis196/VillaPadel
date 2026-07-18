@@ -4,6 +4,7 @@ import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../../firebase/config'
 import { useTorneo } from '../../contexts/TorneoContext'
 import { useIsMobile } from '../../hooks/useIsMobile'
+import { todayStr } from '../../utils/date'
 import Spinner from '../ui/Spinner'
 import './HoyView.css'
 
@@ -15,10 +16,6 @@ const STATUS_CFG = {
   Demorado:     { bg: 'rgba(234,179,8,0.12)',   color: '#eab308' },
   Reprogramado: { bg: 'rgba(167,139,250,0.12)', color: '#a78bfa' },
   _default:     { bg: 'rgba(249,115,22,0.12)',  color: '#f97316' },
-}
-
-function todayStr() {
-  return new Date().toISOString().split('T')[0]
 }
 
 function MatchRow({ match, onClick, isMobile }) {
