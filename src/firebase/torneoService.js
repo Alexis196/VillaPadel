@@ -382,6 +382,16 @@ export async function updateHorario(torneoId, partidoId, { fecha, hora, cancha }
   }, { merge: true })
 }
 
+// ─── Update bracket match schedule (horario) ─────────────────────────────────
+// Separate from updateHorario because llave matches live in their own
+// subcollection — a round can be scheduled ahead of time even while it's
+// still 'Pendiente' (rivals not yet defined from the previous round).
+export async function updateLlaveHorario(torneoId, llaveId, { fecha, hora, cancha }) {
+  await setDoc(doc(db, 'torneos', torneoId, 'llaves', llaveId), {
+    fecha: fecha || null, hora: hora || null, cancha: cancha || null,
+  }, { merge: true })
+}
+
 // ─── Update dupla payment info (per player) ───────────────────────────────────
 export async function updateDuplaPago(torneoId, duplaId, { pago1, pago2 }) {
   await setDoc(doc(db, 'torneos', torneoId, 'duplas', duplaId), {

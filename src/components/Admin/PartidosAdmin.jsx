@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { collection, getDocs, query, orderBy, onSnapshot } from 'firebase/firestore'
 import { db } from '../../firebase/config'
 import {
-  updateHorario, saveResultado, updateEstado, updateLlaveEstado, updateMarcador, updateLlaveMarcador,
+  updateHorario, updateLlaveHorario, saveResultado, updateEstado, updateLlaveEstado, updateMarcador, updateLlaveMarcador,
   generateBracket, saveLlaveResultado, computeMatchResult, checkAmericanSetWinner,
 } from '../../firebase/torneoService'
 import { useTorneo } from '../../contexts/TorneoContext'
@@ -654,6 +654,8 @@ function MatchRow({ match, torneoId, modalidad, onUpdated, open, onToggle }) {
 function LlaveRow({ llave, torneoId, modalidad, allowThirdSet, onUpdated }) {
   const [open, setOpen] = useState(false)
   const isCardView = useIsMobile(720)
+  const [tab, setTab] = useState('horario')
+  const [horario, setHorario] = useState({ fecha: llave.fecha || '', hora: llave.hora || '', cancha: llave.cancha || '' })
   const [res, setRes] = useState({
     setsA: llave.resultado?.setsA ?? '',
     setsB: llave.resultado?.setsB ?? '',
@@ -663,6 +665,15 @@ function LlaveRow({ llave, torneoId, modalidad, allowThirdSet, onUpdated }) {
   const [saving, setSaving] = useState(false)
   const [savingEstado, setSavingEstado] = useState(false)
   const [msg, setMsg] = useState('')
+
+  async function saveHorario() {
+    setSaving(true)
+    await updateLlaveHorario(torneoId, llave.id, horario)
+    setSaving(false)
+    setMsg('Horario guardado')
+    setTimeout(() => setMsg(''), 2000)
+    onUpdated({ ...llave, ...horario })
+  }
 
   useEffect(() => {
     if (llave.resultado) {
@@ -698,7 +709,11 @@ function LlaveRow({ llave, torneoId, modalidad, allowThirdSet, onUpdated }) {
   const duplaB = llave.duplaB
   const isBye = llave.estado === 'BYE'
   const isPending = llave.estado === 'Pendiente' || (!duplaA && !duplaB)
-  const canEdit = !isBye && !isPending && duplaA && duplaB
+  // A round can be scheduled (horario) ahead of time even before its rivals
+  // are known — only the score entry actually needs both duplas defined. A
+  // BYE isn't a real match at all, so it's the only case with nothing to open.
+  const canOpen = !isBye
+  const canEditResult = !isBye && !isPending && duplaA && duplaB
 
   async function saveRes() {
     const { setsA, setsB, sets, wo } = res
@@ -732,16 +747,16 @@ function LlaveRow({ llave, torneoId, modalidad, allowThirdSet, onUpdated }) {
       {isCardView ? (
         <div
           className="pa-match-mobile-card"
-          style={{ cursor: canEdit ? 'pointer' : 'default' }}
-          onClick={() => canEdit && setOpen(o => !o)}
-          onMouseEnter={e => { if (canEdit) e.currentTarget.style.background = '#1a1a22' }}
+          style={{ cursor: canOpen ? 'pointer' : 'default' }}
+          onClick={() => canOpen && setOpen(o => !o)}
+          onMouseEnter={e => { if (canOpen) e.currentTarget.style.background = '#1a1a22' }}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
             <span className="pa-round-cell">{llave.roundName}</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span className="pa-badge" style={{ background: cfg.bg, color: cfg.color }}>{llave.estado}</span>
-              {canEdit && <span className="pa-muted" style={{ fontSize: 14 }}>{open ? '▲' : '▼'}</span>}
+              {canOpen && <span className="pa-muted" style={{ fontSize: 14 }}>{open ? '▲' : '▼'}</span>}
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -773,9 +788,9 @@ function LlaveRow({ llave, torneoId, modalidad, allowThirdSet, onUpdated }) {
       ) : (
         <div
           className="pa-llave-row-desktop"
-          style={{ cursor: canEdit ? 'pointer' : 'default' }}
-          onClick={() => canEdit && setOpen(o => !o)}
-          onMouseEnter={e => { if (canEdit) e.currentTarget.style.background = '#1a1a22' }}
+          style={{ cursor: canOpen ? 'pointer' : 'default' }}
+          onClick={() => canOpen && setOpen(o => !o)}
+          onMouseEnter={e => { if (canOpen) e.currentTarget.style.background = '#1a1a22' }}
           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
         >
           <div>
@@ -809,13 +824,19 @@ function LlaveRow({ llave, torneoId, modalidad, allowThirdSet, onUpdated }) {
               </span>
             )}
           </div>
-          <div className="pa-chevron">{canEdit && (open ? '▲' : '▼')}</div>
+          <div className="pa-chevron">{canOpen && (open ? '▲' : '▼')}</div>
         </div>
       )}
 
-      {open && canEdit && (
+      {open && canOpen && (
         <div className="pa-expand-panel">
-          {llave.estado !== 'W.O.' && (
+          {!canEditResult && (
+            <p className="pa-muted" style={{ fontSize: 12.5, margin: '0 0 14px' }}>
+              Todavía no se definieron los rivales de esta ronda — se van a completar solos cuando termine la ronda anterior. Mientras tanto podés dejar cargado el horario.
+            </p>
+          )}
+
+          {canEditResult && llave.estado !== 'W.O.' && (
             <div className="pa-estado-row">
               <span className="pa-estado-label">ESTADO:</span>
               <div style={{ minWidth: 170 }}>
@@ -836,7 +857,7 @@ function LlaveRow({ llave, torneoId, modalidad, allowThirdSet, onUpdated }) {
             </div>
           )}
 
-          {llave.estado === 'En juego' ? (
+          {canEditResult && llave.estado === 'En juego' ? (
             <LiveScorePanel
               match={llave}
               torneoId={torneoId}
@@ -848,33 +869,71 @@ function LlaveRow({ llave, torneoId, modalidad, allowThirdSet, onUpdated }) {
             />
           ) : (
             <>
-              <div className="pa-result-row" style={{ marginBottom: 14 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="pa-result-dupla-name">
-                    {duplaA.jugador1}{duplaA.jugador2 ? ` / ${duplaA.jugador2}` : ''}
-                  </div>
-                  <div className="pa-field-label-sm">SETS GANADOS</div>
-                  <input type="number" min="0" max="3" value={res.setsA} onChange={e => setRes(p => ({ ...p, setsA: e.target.value }))} className="pa-input-num" />
+              {canEditResult && (
+                <div style={{ marginBottom: 14 }}>
+                  <AppSelect
+                    value={tab}
+                    onChange={setTab}
+                    options={[
+                      { value: 'horario',    label: '📅 Horario' },
+                      { value: 'resultado',  label: '⚽ Resultado manual' },
+                    ]}
+                    minWidth={isCardView ? undefined : 200}
+                  />
                 </div>
-                <div className="pa-muted" style={{ fontWeight: 700, fontSize: 16, flexShrink: 0 }}>vs</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="pa-result-dupla-name">
-                    {duplaB.jugador1}{duplaB.jugador2 ? ` / ${duplaB.jugador2}` : ''}
+              )}
+
+              {(!canEditResult || tab === 'horario') && (
+                <div className="pa-horario-form">
+                  <div style={{ flex: isCardView ? '1 1 100%' : 'none' }}>
+                    <div className="pa-field-label">FECHA</div>
+                    <input type="date" value={horario.fecha} onChange={e => setHorario(p => ({ ...p, fecha: e.target.value }))} className="pa-input" style={{ width: isCardView ? '100%' : 160 }} />
                   </div>
-                  <div className="pa-field-label-sm">SETS GANADOS</div>
-                  <input type="number" min="0" max="3" value={res.setsB} onChange={e => setRes(p => ({ ...p, setsB: e.target.value }))} className="pa-input-num" />
+                  <div style={{ flex: isCardView ? '1 1 45%' : 'none' }}>
+                    <div className="pa-field-label">HORA</div>
+                    <input type="time" value={horario.hora} onChange={e => setHorario(p => ({ ...p, hora: e.target.value }))} className="pa-input" style={{ width: isCardView ? '100%' : 130 }} />
+                  </div>
+                  <div style={{ flex: isCardView ? '1 1 45%' : 'none' }}>
+                    <div className="pa-field-label">CANCHA</div>
+                    <input placeholder="ej. Cancha 1" value={horario.cancha} onChange={e => setHorario(p => ({ ...p, cancha: e.target.value }))} className="pa-input" style={{ width: isCardView ? '100%' : 150 }} />
+                  </div>
+                  <button onClick={saveHorario} disabled={saving} className="pa-btn-save pa-btn-blue" style={{ cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1, flex: isCardView ? '1 1 100%' : 'none' }}>
+                    {saving ? '...' : 'Guardar horario'}
+                  </button>
                 </div>
-              </div>
-              <SetsBreakdown setsA={res.setsA} setsB={res.setsB} sets={res.sets} onChange={sets => setRes(p => ({ ...p, sets }))} />
-              <div className="pa-result-actions">
-                <label className="pa-wo-label">
-                  <input type="checkbox" checked={res.wo} onChange={e => setRes(p => ({ ...p, wo: e.target.checked }))} />
-                  W.O.
-                </label>
-                <button onClick={saveRes} disabled={saving} className="pa-btn-save pa-btn-green" style={{ cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1, flex: isCardView ? 1 : 'none' }}>
-                  {saving ? '...' : 'Guardar resultado'}
-                </button>
-              </div>
+              )}
+
+              {canEditResult && tab === 'resultado' && (
+                <>
+                  <div className="pa-result-row" style={{ marginBottom: 14 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="pa-result-dupla-name">
+                        {duplaA.jugador1}{duplaA.jugador2 ? ` / ${duplaA.jugador2}` : ''}
+                      </div>
+                      <div className="pa-field-label-sm">SETS GANADOS</div>
+                      <input type="number" min="0" max="3" value={res.setsA} onChange={e => setRes(p => ({ ...p, setsA: e.target.value }))} className="pa-input-num" />
+                    </div>
+                    <div className="pa-muted" style={{ fontWeight: 700, fontSize: 16, flexShrink: 0 }}>vs</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="pa-result-dupla-name">
+                        {duplaB.jugador1}{duplaB.jugador2 ? ` / ${duplaB.jugador2}` : ''}
+                      </div>
+                      <div className="pa-field-label-sm">SETS GANADOS</div>
+                      <input type="number" min="0" max="3" value={res.setsB} onChange={e => setRes(p => ({ ...p, setsB: e.target.value }))} className="pa-input-num" />
+                    </div>
+                  </div>
+                  <SetsBreakdown setsA={res.setsA} setsB={res.setsB} sets={res.sets} onChange={sets => setRes(p => ({ ...p, sets }))} />
+                  <div className="pa-result-actions">
+                    <label className="pa-wo-label">
+                      <input type="checkbox" checked={res.wo} onChange={e => setRes(p => ({ ...p, wo: e.target.checked }))} />
+                      W.O.
+                    </label>
+                    <button onClick={saveRes} disabled={saving} className="pa-btn-save pa-btn-green" style={{ cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1, flex: isCardView ? 1 : 'none' }}>
+                      {saving ? '...' : 'Guardar resultado'}
+                    </button>
+                  </div>
+                </>
+              )}
             </>
           )}
           {msg && <p className={msg.startsWith('⚠') || msg.startsWith('Error') ? 'pa-feedback-err' : 'pa-feedback-ok'}>{msg}</p>}
